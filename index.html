@@ -440,7 +440,7 @@ button {
 <header>
   <div class="header-left">
     <h1 id="appTitle" title="Clique 3x para alternar modo administrador">📒 Agenda de Telefones</h1>
-    <div id="appVersion">2.0.0</div>
+    <div id="appVersion">2.1.0</div>
   </div>
   <div class="engrenagem" onclick="abrirAdmin()">⚙️</div>
 </header>
@@ -563,10 +563,14 @@ button {
 <!-- Firebase (CDN compat) -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 
 <script>
 // =================== CONFIG / ESTADO LOCAL ===================
 const JSON_VERSION_KEY = "__versao";
+
+// 🔗 URL do webhook do Power Automate (cole aqui a URL depois de criar o fluxo)
+const WEBHOOK_URL = ""; // exemplo: "https://prod-XX.../invoke?api-version=2016-10-01"
 
 let dados = JSON.parse(localStorage.getItem("agendaTelefones") || "{}");
 let dadosVersao = Number(localStorage.getItem("agendaTelefonesVersao") || "1");
@@ -592,19 +596,20 @@ const LOGO_WHATS = "https://img.freepik.com/vetores-premium/icone-do-whatsapp-re
 
 async function inicializarFirebase() {
   try {
-    // TODO: cole aqui seu firebaseConfig do Firebase Console (rafa-agenda)
-   const firebaseConfig = {
-  apiKey: "AIzaSyDTYCyI-LAD-dn6dyAtnL79NwqFfK-myiw",
-  authDomain: "rafa-agenda.firebaseapp.com",
-  projectId: "rafa-agenda",
-  storageBucket: "rafa-agenda.firebasestorage.app",
-  messagingSenderId: "117248247412",
-  appId: "1:117248247412:web:3871f4dd2960d5e05e7321",
-  measurementId: "G-40FPHD7J4S"
-};
+    // ⚠️ Preencha esse config com o snippet do Firebase Console
+    const firebaseConfig = {
+      apiKey: "SUA_API_KEY_AQUI",
+      authDomain: "rafa-agenda.firebaseapp.com",
+      projectId: "rafa-agenda"
+    };
 
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+
+    // login anônimo para permitir write com regra "request.auth != null"
+    await firebase.auth().signInAnonymously();
+    console.log("[DEBUG] Autenticado anonimamente no Firebase.");
+
     firebaseOk = true;
     console.log("[DEBUG] Firebase inicializado.");
   } catch (e) {
@@ -613,34 +618,66 @@ async function inicializarFirebase() {
   }
 }
 
-// Salva local + dispara sync na nuvem
+// Salva local
 function salvarLocal() {
   localStorage.setItem("agendaTelefones", JSON.stringify(dados));
 }
 
-async function salvarNaNuvem() {
-  if (!firebaseOk || !db) return;
+// Envia backup para o webhook do Power Automate
+async function enviarBackupWebhook() {
+  if (!WEBHOOK_URL) {
+    return; // se não tiver URL configurada, não faz nada
+  }
   try {
-    dadosVersao = (dadosVersao || 1) + 1;
-    localStorage.setItem("agendaTelefonesVersao", String(dadosVersao));
+    const payload = {
+      versao: dadosVersao || 1,
+      atualizadoEmLocal: new Date().toISOString(),
+      dados: dados
+    };
 
-    await db.collection("config").doc("agenda").set({
-      dados,
-      versao: dadosVersao,
-      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
     });
 
-    console.log("[DEBUG] Dados enviados para Firestore. versao =", dadosVersao);
-    showToast("Sincronizado na nuvem (Firestore).");
+    console.log("[DEBUG] Backup enviado para webhook Power Automate.");
+  } catch (err) {
+    console.error("[DEBUG] Erro ao enviar backup para webhook:", err);
+  }
+}
+
+// Salva na nuvem (Firestore) + dispara webhook
+async function salvarNaNuvem() {
+  try {
+    if (firebaseOk && db) {
+      dadosVersao = (dadosVersao || 1) + 1;
+      localStorage.setItem("agendaTelefonesVersao", String(dadosVersao));
+
+      await db.collection("config").doc("agenda").set({
+        dados,
+        versao: dadosVersao,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log("[DEBUG] Dados enviados para Firestore. versao =", dadosVersao);
+      showToast("Sincronizado na nuvem (Firestore).");
+    } else {
+      console.log("[DEBUG] Firebase não disponível, salvando apenas local + webhook.");
+    }
   } catch (err) {
     console.error("[DEBUG] Erro ao salvar na nuvem:", err);
     showToast("Erro ao sincronizar na nuvem.");
   }
+
+  // independente de Firestore, tenta enviar backup pro webhook
+  enviarBackupWebhook();
 }
 
 function salvarLocalENuvem() {
   salvarLocal();
-  // não precisa await aqui
   salvarNaNuvem();
 }
 
@@ -659,7 +696,6 @@ async function carregarDaNuvem() {
 
     console.log("[DEBUG] Dados Firestore carregados. versaoRemota =", versaoRemota);
 
-    // se local vazio ou remoto mais novo, sobrescreve
     const localVazio = !dados || Object.keys(dados).length === 0;
     if (localVazio || versaoRemota > dadosVersao) {
       dados = remoto;

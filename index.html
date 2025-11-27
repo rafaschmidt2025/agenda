@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Agenda de Telefones</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+* {
+  box-sizing: border-box;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+  margin:0;
+  background:#f4f7fb;
+}
+
+/* Modo leitura (sem admin) – esconde só botões de edição, NÃO a estrela */
+body.modo-view-only .engrenagem,
+body.modo-view-only .category-menu-btn,
+body.modo-view-only .link-menu-btn {
+  display:none !important;
+}
+
+header {
+  background:#2563eb;
+  color:#fff;
+  padding:15px 20px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+header h1 {
+  font-size:20px;
+  margin:0;
+  cursor:pointer;
+}
+
+#appVersion {
+  font-size:11px;
+  opacity:0.35;
+  margin-top:2px;
+  letter-spacing:0.06em;
+  pointer-events:none;
+}
+
+.header-left {
+  display:flex;
+  flex-direction:column;
+}
+
+.engrenagem {
+  font-size:24px;
+  cursor:pointer;
+}
+
+.engrenagem:hover {
+  transform: rotate(45deg);
+  transition:.3s;
+}
+
+.container {
+  padding:20px;
+}
+
+/* Busca */
+#searchInput {
+  width:100%;
+  max-width:400px;
+  padding:8px 10px;
+  margin:0 0 14px 0;
+  border-radius:8px;
+  border:1px solid #d1d5db;
+  font-size:13px;
+}
+
+/* Layout das categorias - CSS Grid */
+.grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap:16px;
+  align-items:flex-start;
+}
+
+/* Card da categoria */
+.category {
+  background:white;
+  padding:10px 15px 15px 15px;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.05);
+  width:100%;
+  align-self:flex-start;
+}
+
+/* Cabeçalho da categoria (título + seta + menu) */
+.category-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:6px;
+}
+
+.category-title {
+  color:#2563eb;
+  font-size:18px;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+.category-right {
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.category-arrow {
+  font-size:16px;
+  color:#6b7280;
+  cursor:pointer;
+}
+
+/* Botão menu categoria (3 pontinhos) */
+.category-menu-btn {
+  font-size:16px;
+  color:#6b7280;
+  cursor:pointer;
+}
+
+/* Corpo da categoria (lista de contatos) */
+.category-body {
+  border-top:1px solid #e5e7eb;
+  margin-top:6px;
+  padding-top:6px;
+  max-height:320px;
+  overflow-y:auto;
+}
+
+/* Card de contato */
+.link-card {
+  position:relative;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  padding:10px;
+  margin:10px 0;
+  background:#f9fafb;
+  border-radius:10px;
+  border:1px solid #e5e7eb;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.link-card:hover {
+  background:#eff6ff;
+  transform: translateY(-2px);
+}
+
+/* Avatar com iniciais */
+.avatar-circle {
+  width:32px;
+  height:32px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  font-weight:bold;
+  background:#2563eb22;
+  color:#2563eb;
+}
+
+.link-content {
+  flex:1;
+}
+
+.link-content strong {
+  font-size:14px;
+}
+
+.link-content p {
+  margin:2px 0 0 0;
+  font-size:12px;
+  color:#6b7280;
+}
+
+/* linha telefone + ícone WhatsApp */
+.phone-line {
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+/* Botão dos 3 pontinhos (contato) */
+.link-menu-btn {
+  position:absolute;
+  top:6px;
+  right:8px;
+  font-size:16px;
+  cursor:pointer;
+  opacity:0;
+  transition:0.2s;
+}
+
+/* Botão de favorito (estrela) */
+.favorite-btn {
+  position:absolute;
+  top:6px;
+  right:26px;
+  font-size:16px;
+  cursor:pointer;
+  color:#d1d5db;
+}
+
+.favorite-btn.favorito {
+  color:#f59e0b;
+}
+
+/* Mostra pontinhos no hover em desktop */
+.link-card:hover .link-menu-btn {
+  opacity:1;
+}
+
+/* Painel admin (cadastro/edição) */
+#adminPanel {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.6);
+  justify-content:center;
+  align-items:center;
+  z-index:900;
+}
+
+.admin-box {
+  background:#ffffff;
+  padding:20px;
+  width:90%;
+  max-width:500px;
+  border-radius:16px;
+}
+
+.admin-box h2 {
+  margin-top:0;
+  color:#2563eb;
+}
+
+input, select, textarea {
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+  margin-bottom:12px;
+  border-radius:8px;
+  border:1px solid #d1d5db;
+  font-size:13px;
+}
+
+button {
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+/* linha com Salvar / Fechar lado a lado */
+.action-buttons {
+  display:flex;
+  gap:8px;
+  margin-top:4px;
+  margin-bottom:10px;
+}
+
+.action-buttons .add,
+.action-buttons .close {
+  flex:1;
+}
+
+.add {
+  background:#2563eb;
+  color:#fff;
+}
+
+.close {
+  background:#e5e7eb;
+}
+
+/* Menu de contexto (editar/apagar) */
+.context-menu {
+  position:fixed;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  border-radius:8px;
+  box-shadow:0 8px 20px rgba(0,0,0,0.15);
+  padding:6px 0;
+  display:none;
+  z-index:1000;
+}
+
+.context-menu button {
+  width:100%;
+  text-align:left;
+  padding:8px 14px;
+  background:none;
+  border:none;
+  font-size:13px;
+  color:#111827;
+}
+
+.context-menu button:hover {
+  background:#eff6ff;
+}
+
+/* Toast de feedback */
+#toast {
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#111827;
+  color:#f9fafb;
+  padding:10px 16px;
+  border-radius:999px;
+  font-size:13px;
+  box-shadow:0 6px 16px rgba(0,0,0,0.25);
+  display:none;
+  z-index:1100;
+}
+
+/* Modal de detalhes do contato */
+#detalheContatoPanel {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.6);
+  justify-content:center;
+  align-items:center;
+  z-index:950;
+}
+
+.detalhe-box {
+  background:#ffffff;
+  padding:20px;
+  width:90%;
+  max-width:420px;
+  border-radius:16px;
+}
+
+.detalhe-header {
+  display:flex;
+  gap:12px;
+  align-items:center;
+  margin-bottom:12px;
+}
+
+.detalhe-nome {
+  font-size:18px;
+  font-weight:bold;
+  color:#111827;
+}
+
+.detalhe-categoria {
+  font-size:12px;
+  color:#6b7280;
+}
+
+.detalhe-linha {
+  font-size:14px;
+  margin:6px 0;
+}
+
+.detalhe-linha span.label {
+  font-weight:bold;
+  color:#374151;
+}
+
+.detalhe-acoes {
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:16px;
+}
+
+.btn-sec {
+  background:#e5e7eb;
+}
+
+.btn-pri {
+  background:#2563eb;
+  color:#fff;
+}
+
+/* Logo WhatsApp */
+.whats-icon {
+  width:16px;
+  height:16px;
+  display:block;
+}
+
+/* Botão de WhatsApp (detalhe) */
+.whats-btn {
+  margin-left:8px;
+  padding:4px 8px;
+  font-size:14px;
+  border-radius:999px;
+  border:none;
+  cursor:pointer;
+  background:#22c55e;
+  color:#ffffff;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* Botão de WhatsApp nos cards */
+.whats-btn-card {
+  padding:2px 6px;
+  font-size:13px;
+  border-radius:999px;
+  border:none;
+  cursor:pointer;
+  background:#22c55e;
+  color:#ffffff;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* Mobile: mostrar sempre o menu ⋮ dos contatos */
+@media (max-width: 600px) {
+  .link-menu-btn {
+    opacity:1;
+  }
+}
+</style>
+</head>
+
+<body class="modo-view-only">
+<header>
+  <div class="header-left">
+    <h1 id="appTitle" title="Clique 3x para alternar modo administrador">📒 Agenda de Telefones</h1>
+    <div id="appVersion">2.0.0</div>
+  </div>
+  <div class="engrenagem" onclick="abrirAdmin()">⚙️</div>
+</header>
+
+<div class="container">
+  <!-- Busca -->
+  <input id="searchInput" placeholder="Buscar por nome, telefone, celular, e-mail..." oninput="filtrar()" />
+
+  <!-- Categorias -->
+  <div class="grid" id="linkContainer"></div>
+</div>
+
+<!-- PAINEL ADMIN (cadastro/edição) -->
+<div id="adminPanel">
+  <div class="admin-box">
+    <h2 id="adminTitle">Adicionar contato</h2>
+
+    <label>Categoria</label>
+    <input type="text" id="catInput" list="catList" placeholder="Ex: Trabalho, Família, Amigos">
+    <datalist id="catList"></datalist>
+
+    <label>Nome</label>
+    <input type="text" id="nameInput" placeholder="Ex: João da Silva">
+
+    <label>Telefone (fixo)</label>
+    <input type="text" id="phoneInput" placeholder="Ex: (38) 3321-0000" maxlength="15">
+
+    <label>Celular</label>
+    <input type="text" id="celularInput" placeholder="Ex: (38) 99999-0000" maxlength="16">
+
+    <label>E-mail</label>
+    <input type="email" id="emailInput" placeholder="Ex: joao@empresa.com">
+
+    <label>Empresa</label>
+    <input type="text" id="empresaInput" placeholder="Ex: SERPRO">
+
+    <label>Função / Cargo</label>
+    <input type="text" id="funcaoInput" placeholder="Ex: Analista de Sistemas">
+
+    <label>Data de nascimento</label>
+    <input type="date" id="nascInput">
+
+    <label>Observações</label>
+    <textarea id="descInput" placeholder="Ramal, horário, outros detalhes..."></textarea>
+
+    <div class="action-buttons">
+      <button class="add" onclick="salvar()">Salvar contato</button>
+      <button class="close" onclick="fecharAdmin()">Fechar</button>
+    </div>
+
+    <div id="syncInfo" style="margin-top:4px; font-size:11px; color:#6b7280;"></div>
+  </div>
+</div>
+
+<!-- MODAL DE DETALHES DO CONTATO -->
+<div id="detalheContatoPanel">
+  <div class="detalhe-box">
+    <div class="detalhe-header">
+      <div class="avatar-circle" id="detalheAvatar"></div>
+      <div>
+        <div class="detalhe-nome" id="detalheNome"></div>
+        <div class="detalhe-categoria" id="detalheCategoria"></div>
+      </div>
+    </div>
+
+    <div class="detalhe-linha">
+      <span class="label">Empresa: </span>
+      <span id="detalheEmpresa"></span>
+    </div>
+    <div class="detalhe-linha">
+      <span class="label">Função / Cargo: </span>
+      <span id="detalheFuncao"></span>
+    </div>
+    <div class="detalhe-linha">
+      <span class="label">Telefone: </span>
+      <span id="detalheTelefone"></span>
+    </div>
+    <div class="detalhe-linha">
+      <span class="label">Celular: </span>
+      <span id="detalheCelular"></span>
+      <button class="whats-btn" id="detalheWhatsBtn" title="Abrir WhatsApp" onclick="abrirWhatsApp()">
+        <img class="whats-icon" src="https://img.freepik.com/vetores-premium/icone-do-whatsapp-rede-social-para-mensagens-editorial-ilustracao-vetorial-vinnytsia-ucrania-9-de-junho-de-2022_350225-70.jpg?semt=ais_hybrid&w=740&q=80" alt="WhatsApp">
+      </button>
+    </div>
+    <div class="detalhe-linha">
+      <span class="label">E-mail: </span>
+      <span id="detalheEmail"></span>
+    </div>
+    <div class="detalhe-linha">
+      <span class="label">Data de nascimento: </span>
+      <span id="detalheNascimento"></span>
+    </div>
+    <div class="detalhe-linha">
+      <span class="label">Observações: </span>
+      <span id="detalheObs"></span>
+    </div>
+
+    <div class="detalhe-acoes">
+      <button class="btn-sec" onclick="fecharDetalhe()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MENU DE CONTEXTO DOS CONTATOS -->
+<div id="contextMenu" class="context-menu" data-categoria="" data-index="">
+  <button onclick="editarContato()">✏️ Editar</button>
+  <button onclick="apagarContato()">🗑️ Apagar</button>
+</div>
+
+<!-- MENU DE CONTEXTO DAS CATEGORIAS -->
+<div id="categoryMenu" class="context-menu" data-categoria="">
+  <button onclick="adicionarContatoCategoria()">➕ Adicionar contato</button>
+  <button onclick="renomearCategoria()">✏️ Renomear categoria</button>
+  <button onclick="excluirCategoria()">🗑️ Excluir categoria</button>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- Firebase (CDN compat) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<script>
+// =================== CONFIG / ESTADO LOCAL ===================
+const JSON_VERSION_KEY = "__versao";
+
+let dados = JSON.parse(localStorage.getItem("agendaTelefones") || "{}");
+let dadosVersao = Number(localStorage.getItem("agendaTelefonesVersao") || "1");
+
+let editInfo = null; // { categoria, index }
+let lastCategory = localStorage.getItem("agendaTelefonesUltimaCategoria") || "";
+let collapsedCategories = new Set(
+  JSON.parse(localStorage.getItem("agendaTelefonesCategoriasFechadas") || "[]")
+);
+
+// modo admin/leitura
+let isAdmin = JSON.parse(localStorage.getItem("agendaTelefonesIsAdmin") || "false");
+
+// contato atualmente aberto no modal de detalhes
+let contatoDetalhe = null;
+// último número usado para WhatsApp (detalhe)
+let ultimoCelularWhats = "";
+
+// =================== FIREBASE / FIRESTORE ===================
+let db = null;
+let firebaseOk = false;
+const LOGO_WHATS = "https://img.freepik.com/vetores-premium/icone-do-whatsapp-rede-social-para-mensagens-editorial-ilustracao-vetorial-vinnytsia-ucrania-9-de-junho-de-2022_350225-70.jpg?semt=ais_hybrid&w=740&q=80";
+
+async function inicializarFirebase() {
+  try {
+    // TODO: cole aqui seu firebaseConfig do Firebase Console (rafa-agenda)
+   const firebaseConfig = {
+  apiKey: "AIzaSyDTYCyI-LAD-dn6dyAtnL79NwqFfK-myiw",
+  authDomain: "rafa-agenda.firebaseapp.com",
+  projectId: "rafa-agenda",
+  storageBucket: "rafa-agenda.firebasestorage.app",
+  messagingSenderId: "117248247412",
+  appId: "1:117248247412:web:3871f4dd2960d5e05e7321",
+  measurementId: "G-40FPHD7J4S"
+};
+
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    firebaseOk = true;
+    console.log("[DEBUG] Firebase inicializado.");
+  } catch (e) {
+    console.error("[DEBUG] Erro ao iniciar Firebase. Rodando só localStorage.", e);
+    firebaseOk = false;
+  }
+}
+
+// Salva local + dispara sync na nuvem
+function salvarLocal() {
+  localStorage.setItem("agendaTelefones", JSON.stringify(dados));
+}
+
+async function salvarNaNuvem() {
+  if (!firebaseOk || !db) return;
+  try {
+    dadosVersao = (dadosVersao || 1) + 1;
+    localStorage.setItem("agendaTelefonesVersao", String(dadosVersao));
+
+    await db.collection("config").doc("agenda").set({
+      dados,
+      versao: dadosVersao,
+      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    console.log("[DEBUG] Dados enviados para Firestore. versao =", dadosVersao);
+    showToast("Sincronizado na nuvem (Firestore).");
+  } catch (err) {
+    console.error("[DEBUG] Erro ao salvar na nuvem:", err);
+    showToast("Erro ao sincronizar na nuvem.");
+  }
+}
+
+function salvarLocalENuvem() {
+  salvarLocal();
+  // não precisa await aqui
+  salvarNaNuvem();
+}
+
+// Carrega da nuvem se tiver algo
+async function carregarDaNuvem() {
+  if (!firebaseOk || !db) return;
+  try {
+    const snap = await db.collection("config").doc("agenda").get();
+    if (!snap.exists) {
+      console.log("[DEBUG] Nenhum doc 'config/agenda' na nuvem ainda. Mantendo dados locais.");
+      return;
+    }
+    const data = snap.data() || {};
+    const remoto = data.dados || {};
+    const versaoRemota = Number(data.versao || 1);
+
+    console.log("[DEBUG] Dados Firestore carregados. versaoRemota =", versaoRemota);
+
+    // se local vazio ou remoto mais novo, sobrescreve
+    const localVazio = !dados || Object.keys(dados).length === 0;
+    if (localVazio || versaoRemota > dadosVersao) {
+      dados = remoto;
+      dadosVersao = versaoRemota;
+      salvarLocal();
+      localStorage.setItem("agendaTelefonesVersao", String(dadosVersao));
+      console.log("[DEBUG] Dados locais atualizados a partir da nuvem.");
+      showToast("Agenda carregada da nuvem.");
+    } else {
+      console.log("[DEBUG] Dados locais já mais novos ou iguais. Mantendo local.");
+    }
+  } catch (err) {
+    console.error("[DEBUG] Erro ao carregar da nuvem:", err);
+  }
+}
+
+// =================== UTILITÁRIOS / UI ===================
+function showToast(msg){
+  const toast = document.getElementById("toast");
+  toast.textContent = msg;
+  toast.style.display = "block";
+  setTimeout(() => {
+    toast.style.display = "none";
+  }, 2500);
+}
+
+function aplicarModoAdmin(){
+  if (isAdmin) {
+    document.body.classList.remove("modo-view-only");
+  } else {
+    document.body.classList.add("modo-view-only");
+  }
+}
+
+function alternarModoAdmin(){
+  isAdmin = !isAdmin;
+  localStorage.setItem("agendaTelefonesIsAdmin", JSON.stringify(isAdmin));
+  aplicarModoAdmin();
+  showToast(isAdmin ? "Modo administrador ativado." : "Modo leitura ativado.");
+}
+
+// clique triplo no título
+let tituloClickCount = 0;
+let tituloClickTimer = null;
+
+function handleTituloTripleClick() {
+  tituloClickCount++;
+  if (tituloClickTimer) clearTimeout(tituloClickTimer);
+  tituloClickTimer = setTimeout(() => {
+    tituloClickCount = 0;
+    tituloClickTimer = null;
+  }, 600);
+
+  if (tituloClickCount >= 3) {
+    tituloClickCount = 0;
+    tituloClickTimer = null;
+    alternarModoAdmin();
+  }
+}
+
+const tituloEl = document.getElementById("appTitle");
+if (tituloEl) {
+  tituloEl.addEventListener("click", handleTituloTripleClick);
+}
+
+// atalho Ctrl+Shift+A
+document.addEventListener("keydown", function(e){
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "a") {
+    e.preventDefault();
+    alternarModoAdmin();
+  }
+});
+
+// máscara de telefone / celular (formato brasileiro)
+function formatarTelefoneCampo(inputEl){
+  let digits = inputEl.value.replace(/\D/g,"");
+  if (digits.length > 11) digits = digits.slice(0,11);
+
+  if (digits.length <= 2) {
+    inputEl.value = digits;
+    return;
+  }
+
+  if (digits.length <= 6) {
+    inputEl.value = `(${digits.slice(0,2)}) ${digits.slice(2)}`;
+    return;
+  }
+
+  if (digits.length <= 10) {
+    inputEl.value = `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+    return;
+  }
+
+  inputEl.value = `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
+}
+
+const phoneInput = document.getElementById("phoneInput");
+const celularInput = document.getElementById("celularInput");
+
+if (phoneInput) {
+  phoneInput.addEventListener("input", () => formatarTelefoneCampo(phoneInput));
+}
+if (celularInput) {
+  celularInput.addEventListener("input", () => formatarTelefoneCampo(celularInput));
+}
+
+// =================== ADMIN PANEL ===================
+function abrirAdmin(){
+  if (!isAdmin) return;
+  document.getElementById("adminPanel").style.display="flex";
+
+  setTimeout(() => {
+    if (editInfo) {
+      document.getElementById("nameInput").focus();
+      document.getElementById("nameInput").select();
+    } else {
+      const catInput = document.getElementById("catInput");
+      catInput.value = lastCategory || "";
+      catInput.focus();
+      catInput.select();
+    }
+  }, 50);
+}
+
+function fecharAdmin(){
+  document.getElementById("adminPanel").style.display="none";
+  editInfo = null;
+  document.getElementById("adminTitle").textContent = "Adicionar contato";
+}
+
+// Enter para salvar
+[
+  "catInput","nameInput","phoneInput","celularInput",
+  "emailInput","empresaInput","funcaoInput","nascInput","descInput"
+].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("keydown", function(e){
+    if(e.key === "Enter"){
+      e.preventDefault();
+      salvar();
+    }
+  });
+});
+
+// =================== LÓGICA PRINCIPAL ===================
+function iniciaisNome(nome){
+  if (!nome) return "?";
+  const partes = nome.trim().split(/\s+/);
+  if (partes.length === 1) return partes[0].charAt(0).toUpperCase();
+  return (partes[0].charAt(0) + partes[partes.length-1].charAt(0)).toUpperCase();
+}
+
+function contarContatos(){
+  let total = 0;
+  for (const cat in dados) {
+    if (cat === JSON_VERSION_KEY) continue;
+    const arr = dados[cat];
+    if (Array.isArray(arr)) total += arr.length;
+  }
+  return total;
+}
+
+function atualizarInfoSincronizacao(){
+  const el = document.getElementById("syncInfo");
+  if (!el) return;
+  el.textContent = "Contatos atuais: " + contarContatos();
+}
+
+function formatarDataBR(iso){
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const dia = String(d.getDate()).padStart(2,"0");
+  const mes = String(d.getMonth()+1).padStart(2,"0");
+  const ano = d.getFullYear();
+  return `${dia}/${mes}/${ano}`;
+}
+
+// salvar contato
+function salvar() {
+  const categoriaDigitada = document.getElementById("catInput").value.trim();
+  const nome = document.getElementById("nameInput").value.trim();
+  const telefone = document.getElementById("phoneInput").value.trim();
+  const celular = document.getElementById("celularInput").value.trim();
+  const email = document.getElementById("emailInput").value.trim();
+  const empresa = document.getElementById("empresaInput").value.trim();
+  const funcao = document.getElementById("funcaoInput").value.trim();
+  const nascimento = document.getElementById("nascInput").value;
+  const obs = document.getElementById("descInput").value.trim();
+
+  if (!categoriaDigitada || !nome) {
+    showToast("Preencha pelo menos categoria e nome.");
+    return;
+  }
+
+  // normaliza categoria (case-insensitive)
+  let categoriaChave = categoriaDigitada;
+  for (const cat in dados) {
+    if (cat.toLowerCase() === categoriaDigitada.toLowerCase()) {
+      categoriaChave = cat;
+      break;
+    }
+  }
+
+  const celularChave = celular.replace(/\D/g, "");
+  const emailLower = email.toLowerCase();
+
+  // checa duplicados: mesmo celular OU mesmo e-mail, em qualquer categoria
+  const duplicados = [];
+  for (const [cat, contatosCat] of Object.entries(dados || {})) {
+    if (!Array.isArray(contatosCat)) continue;
+
+    contatosCat.forEach((c, idx) => {
+      if (editInfo &&
+          editInfo.categoria === cat &&
+          editInfo.index === idx) {
+        return;
+      }
+      const celExistente = (c.celular || "").replace(/\D/g, "");
+      const emailExistente = (c.email || "").trim().toLowerCase();
+
+      const mesmoCel = celularChave && celExistente && celularChave === celExistente;
+      const mesmoEmail = emailLower && emailExistente && emailLower === emailExistente;
+
+      if (mesmoCel || mesmoEmail) {
+        duplicados.push({ categoria: cat, contato: c });
+      }
+    });
+  }
+
+  if (duplicados.length > 0) {
+    let msg = "Já existe contato com mesmo celular/e-mail em: ";
+    msg += duplicados.map(d => `[${d.categoria}] "${d.contato.nome}"`).join(" | ");
+    showToast(msg);
+    return false; // não salva
+  }
+
+  let msgToast = "Contato salvo com sucesso.";
+
+  if (editInfo) {
+    const oldCat = editInfo.categoria;
+    const oldIndex = editInfo.index;
+    const oldContato = dados[oldCat][oldIndex];
+    const favorito = oldContato.favorito === true;
+
+    const novoContato = {
+      nome,
+      telefone,
+      celular,
+      email,
+      empresa,
+      funcao,
+      nascimento,
+      obs,
+      favorito
+    };
+
+    if (oldCat.toLowerCase() === categoriaChave.toLowerCase()) {
+      dados[categoriaChave][oldIndex] = novoContato;
+    } else {
+      dados[oldCat].splice(oldIndex, 1);
+      if (dados[oldCat].length === 0) delete dados[oldCat];
+
+      if (!dados[categoriaChave]) dados[categoriaChave] = [];
+      dados[categoriaChave].push(novoContato);
+    }
+    msgToast = "Contato atualizado com sucesso.";
+  } else {
+    if (!dados[categoriaChave]) dados[categoriaChave] = [];
+    dados[categoriaChave].push({
+      nome,
+      telefone,
+      celular,
+      email,
+      empresa,
+      funcao,
+      nascimento,
+      obs,
+      favorito:false
+    });
+  }
+
+  salvarLocalENuvem();
+
+  lastCategory = categoriaChave;
+  localStorage.setItem("agendaTelefonesUltimaCategoria", lastCategory);
+
+  document.getElementById("catInput").value = "";
+  document.getElementById("nameInput").value = "";
+  document.getElementById("phoneInput").value = "";
+  document.getElementById("celularInput").value = "";
+  document.getElementById("emailInput").value = "";
+  document.getElementById("empresaInput").value = "";
+  document.getElementById("funcaoInput").value = "";
+  document.getElementById("nascInput").value = "";
+  document.getElementById("descInput").value = "";
+
+  fecharAdmin();
+  renderizar();
+  atualizarListaCategorias();
+  atualizarInfoSincronizacao();
+  showToast(msgToast);
+
+  return true;
+}
+
+// abrir detalhes do contato (modal)
+function abrirContato(categoria, index) {
+  const contato = (dados[categoria] || [])[index];
+  if (!contato) return;
+
+  contatoDetalhe = { categoria, index };
+
+  const avatar = document.getElementById("detalheAvatar");
+  const nomeEl = document.getElementById("detalheNome");
+  const catEl = document.getElementById("detalheCategoria");
+  const telEl = document.getElementById("detalheTelefone");
+  const celEl = document.getElementById("detalheCelular");
+  const emailEl = document.getElementById("detalheEmail");
+  const obsEl = document.getElementById("detalheObs");
+  const empEl = document.getElementById("detalheEmpresa");
+  const funcEl = document.getElementById("detalheFuncao");
+  const nascEl = document.getElementById("detalheNascimento");
+  const whatsBtn = document.getElementById("detalheWhatsBtn");
+
+  avatar.textContent = iniciaisNome(contato.nome);
+  nomeEl.textContent = contato.nome || "";
+  catEl.textContent = categoria || "";
+  telEl.textContent = contato.telefone || "—";
+  celEl.textContent = contato.celular || "—";
+  emailEl.textContent = contato.email || "—";
+  empEl.textContent = contato.empresa || "—";
+  funcEl.textContent = contato.funcao || "—";
+  nascEl.textContent = contato.nascimento ? formatarDataBR(contato.nascimento) : "—";
+  obsEl.textContent = contato.obs || "—";
+
+  const celularNumerico = (contato.celular || "").replace(/\D/g,"");
+  ultimoCelularWhats = celularNumerico;
+
+  if (celularNumerico && celularNumerico.length >= 10) {
+    whatsBtn.style.display = "inline-flex";
+    whatsBtn.disabled = false;
+  } else {
+    whatsBtn.style.display = "none";
+    whatsBtn.disabled = true;
+  }
+
+  document.getElementById("detalheContatoPanel").style.display = "flex";
+}
+
+function fecharDetalhe() {
+  document.getElementById("detalheContatoPanel").style.display = "none";
+  contatoDetalhe = null;
+  ultimoCelularWhats = "";
+}
+
+// abrir WhatsApp (modal detalhe)
+function abrirWhatsApp(){
+  if (!ultimoCelularWhats) {
+    showToast("Celular inválido para WhatsApp.");
+    return;
+  }
+  let numero = ultimoCelularWhats;
+  if (numero.length === 10 || numero.length === 11) {
+    numero = "55" + numero;
+  }
+  const url = "https://wa.me/" + numero;
+  window.open(url, "_blank");
+}
+
+// abrir WhatsApp a partir do card
+function abrirWhatsAppCard(event, categoria, index){
+  event.stopPropagation();
+  const contato = (dados[categoria] || [])[index];
+  if (!contato) return;
+
+  let numero = (contato.celular || contato.telefone || "").replace(/\D/g,"");
+  if (!numero) {
+    showToast("Contato sem celular/telefone válido para WhatsApp.");
+    return;
+  }
+  if (numero.length === 10 || numero.length === 11) {
+    numero = "55" + numero;
+  }
+  const url = "https://wa.me/" + numero;
+  window.open(url, "_blank");
+}
+
+// alternar favorito
+function toggleFavorito(event, categoria, index){
+  event.stopPropagation();
+  const contato = dados[categoria][index];
+  contato.favorito = !contato.favorito;
+  salvarLocalENuvem();
+  renderizar();
+}
+
+// =================== MENUS DE CONTEXTO ===================
+function abrirMenu(event, categoria, index){
+  event.stopPropagation();
+  fecharMenus();
+  const menu = document.getElementById("contextMenu");
+  menu.style.display = "block";
+  menu.style.left = event.clientX + "px";
+  menu.style.top = event.clientY + "px";
+  menu.dataset.categoria = categoria;
+  menu.dataset.index = index;
+}
+
+function abrirMenuCategoria(event, categoria){
+  event.stopPropagation();
+  if (categoria === "⭐ Favoritos") return;
+  fecharMenus();
+  const menu = document.getElementById("categoryMenu");
+  menu.style.display = "block";
+  menu.style.left = event.clientX + "px";
+  menu.style.top = event.clientY + "px";
+  menu.dataset.categoria = categoria;
+}
+
+function fecharMenus(){
+  document.getElementById("contextMenu").style.display = "none";
+  document.getElementById("categoryMenu").style.display = "none";
+}
+
+function editarContato(){
+  const menu = document.getElementById("contextMenu");
+  const cat = menu.dataset.categoria;
+  const idx = parseInt(menu.dataset.index,10);
+  const contato = dados[cat][idx];
+
+  document.getElementById("catInput").value = cat;
+  document.getElementById("nameInput").value = contato.nome || "";
+  document.getElementById("phoneInput").value = contato.telefone || "";
+  document.getElementById("celularInput").value = contato.celular || "";
+  document.getElementById("emailInput").value = contato.email || "";
+  document.getElementById("empresaInput").value = contato.empresa || "";
+  document.getElementById("funcaoInput").value = contato.funcao || "";
+  document.getElementById("nascInput").value = contato.nascimento || "";
+  document.getElementById("descInput").value = contato.obs || "";
+
+  editInfo = {categoria: cat, index: idx};
+  document.getElementById("adminTitle").textContent = "Editar contato";
+
+  fecharMenus();
+  abrirAdmin();
+}
+
+function apagarContato(){
+  const menu = document.getElementById("contextMenu");
+  const cat = menu.dataset.categoria;
+  const idx = parseInt(menu.dataset.index,10);
+
+  if(confirm("Deseja realmente apagar este contato?")){
+    dados[cat].splice(idx,1);
+    if (dados[cat].length === 0) {
+      delete dados[cat];
+    }
+    salvarLocalENuvem();
+    renderizar();
+    atualizarListaCategorias();
+    atualizarInfoSincronizacao();
+    showToast("Contato apagado.");
+  }
+  fecharMenus();
+}
+
+// ações de categoria
+function adicionarContatoCategoria(){
+  const menu = document.getElementById("categoryMenu");
+  const categoria = menu.dataset.categoria;
+
+  fecharMenus();
+  editInfo = null;
+  document.getElementById("adminTitle").textContent = "Adicionar contato";
+  document.getElementById("catInput").value = categoria;
+  lastCategory = categoria;
+  localStorage.setItem("agendaTelefonesUltimaCategoria", lastCategory);
+
+  document.getElementById("nameInput").value = "";
+  document.getElementById("phoneInput").value = "";
+  document.getElementById("celularInput").value = "";
+  document.getElementById("emailInput").value = "";
+  document.getElementById("empresaInput").value = "";
+  document.getElementById("funcaoInput").value = "";
+  document.getElementById("nascInput").value = "";
+  document.getElementById("descInput").value = "";
+
+  document.getElementById("adminPanel").style.display = "flex";
+
+  setTimeout(() => {
+    document.getElementById("nameInput").focus();
+  }, 50);
+}
+
+function renomearCategoria(){
+  const menu = document.getElementById("categoryMenu");
+  const categoria = menu.dataset.categoria;
+  if (!categoria) return;
+
+  const novoNome = prompt("Novo nome para a categoria:", categoria);
+  if (!novoNome) {
+    fecharMenus();
+    return;
+  }
+
+  const nomeTrim = novoNome.trim();
+  if (!nomeTrim || nomeTrim.toLowerCase() === categoria.toLowerCase()) {
+    fecharMenus();
+    return;
+  }
+
+  let alvo = nomeTrim;
+  for (const cat in dados) {
+    if (cat.toLowerCase() === nomeTrim.toLowerCase()) {
+      alvo = cat;
+      break;
+    }
+  }
+
+  if (!dados[alvo]) dados[alvo] = [];
+  dados[alvo] = dados[alvo].concat(dados[categoria] || []);
+  delete dados[categoria];
+
+  if (lastCategory === categoria) {
+    lastCategory = alvo;
+    localStorage.setItem("agendaTelefonesUltimaCategoria", lastCategory);
+  }
+
+  if (collapsedCategories.has(categoria)) {
+    collapsedCategories.delete(categoria);
+    collapsedCategories.add(alvo);
+    localStorage.setItem(
+      "agendaTelefonesCategoriasFechadas",
+      JSON.stringify(Array.from(collapsedCategories))
+    );
+  }
+
+  salvarLocalENuvem();
+  fecharMenus();
+  renderizar();
+  atualizarListaCategorias();
+  atualizarInfoSincronizacao();
+  showToast(`Categoria renomeada para "${alvo}".`);
+}
+
+function excluirCategoria(){
+  const menu = document.getElementById("categoryMenu");
+  const categoria = menu.dataset.categoria;
+
+  if (!categoria) {
+    fecharMenus();
+    return;
+  }
+
+  const confirma = confirm(
+    `Deseja realmente excluir a categoria "${categoria}" e TODOS os contatos dela?`
+  );
+
+  if (!confirma) {
+    fecharMenus();
+    return;
+  }
+
+  delete dados[categoria];
+  salvarLocalENuvem();
+
+  if (lastCategory === categoria) {
+    lastCategory = "";
+    localStorage.removeItem("agendaTelefonesUltimaCategoria");
+  }
+
+  if (collapsedCategories.has(categoria)) {
+    collapsedCategories.delete(categoria);
+    localStorage.setItem(
+      "agendaTelefonesCategoriasFechadas",
+      JSON.stringify(Array.from(collapsedCategories))
+    );
+  }
+
+  fecharMenus();
+  renderizar();
+  atualizarListaCategorias();
+  atualizarInfoSincronizacao();
+  showToast("Categoria excluída.");
+}
+
+// colapsar/expandir categoria
+function toggleCategoria(categoria){
+  if (collapsedCategories.has(categoria)) {
+    collapsedCategories.delete(categoria);
+  } else {
+    collapsedCategories.add(categoria);
+  }
+  localStorage.setItem(
+    "agendaTelefonesCategoriasFechadas",
+    JSON.stringify(Array.from(collapsedCategories))
+  );
+  renderizar();
+}
+
+// busca geral
+function filtrar(){
+  const termo = document.getElementById("searchInput").value.toLowerCase();
+  const container = document.getElementById("linkContainer");
+  const cards = container.querySelectorAll(".link-card");
+  const categorias = container.querySelectorAll(".category");
+
+  cards.forEach(card => {
+    const texto = card.innerText.toLowerCase();
+    card.style.display = texto.includes(termo) ? "flex" : "none";
+  });
+
+  categorias.forEach(catEl => {
+    const titleEl = catEl.querySelector(".category-title");
+    const catName = titleEl ? titleEl.textContent.toLowerCase() : "";
+    const visibleCards = catEl.querySelectorAll(".link-card[style*='display: flex']");
+    if (termo && !catName.includes(termo) && visibleCards.length === 0) {
+      catEl.style.opacity = "0.25";
+    } else {
+      catEl.style.opacity = "1";
+    }
+  });
+}
+
+// renderizar categorias e contatos
+function renderizar(){
+  const container = document.getElementById("linkContainer");
+  container.innerHTML = "";
+
+  const categoriasBase = Object.keys(dados)
+    .filter(c => c !== JSON_VERSION_KEY)
+    .sort((a,b) => a.localeCompare(b, "pt-BR"));
+
+  // favoritos globais
+  const favoritosGlobais = [];
+  categoriasBase.forEach(categoria => {
+    const arr = dados[categoria] || [];
+    arr.forEach((contato, idx) => {
+      if (contato.favorito) {
+        favoritosGlobais.push({ categoria, index: idx, contato });
+      }
+    });
+  });
+
+  if (favoritosGlobais.length > 0) {
+    const colFav = document.createElement("div");
+    colFav.className = "category";
+
+    const collapsedFav = collapsedCategories.has("⭐ Favoritos");
+    const arrowFav = collapsedFav ? "▸" : "▾";
+
+    let htmlFav = `
+      <div class="category-header">
+        <span class="category-title" onclick="toggleCategoria('⭐ Favoritos')">⭐ Favoritos</span>
+        <div class="category-right">
+          <span class="category-arrow" onclick="toggleCategoria('⭐ Favoritos')">${arrowFav}</span>
+        </div>
+      </div>
+      <div class="category-body" style="display:${collapsedFav ? "none" : "block"};">
+    `;
+
+    favoritosGlobais.sort((a,b) =>
+      a.contato.nome.localeCompare(b.contato.nome, "pt-BR")
+    );
+
+    favoritosGlobais.forEach(item => {
+      const favClass = item.contato.favorito ? "favorite-btn favorito" : "favorite-btn";
+      const iniciais = iniciaisNome(item.contato.nome);
+      const linhaTelefone = item.contato.celular || item.contato.telefone || "";
+      const catEsc = item.categoria.replace(/'/g,"\\'");
+
+      htmlFav += `
+        <div class="link-card" onclick="abrirContato('${catEsc}', ${item.index})">
+          <div class="avatar-circle">${iniciais}</div>
+          <div class="link-content">
+            <strong>${item.contato.nome}</strong>
+            <p class="phone-line">
+              <span>${linhaTelefone}</span>
+              <button class="whats-btn-card" title="WhatsApp" onclick="abrirWhatsAppCard(event, '${catEsc}', ${item.index})">
+                <img class="whats-icon" src="${LOGO_WHATS}" alt="WhatsApp">
+              </button>
+            </p>
+            <p style="margin-top:2px; font-size:11px; color:#9ca3af;">Categoria: ${item.categoria}</p>
+          </div>
+          <span class="${favClass}" onclick="toggleFavorito(event, '${catEsc}', ${item.index})">★</span>
+          <span class="link-menu-btn" onclick="abrirMenu(event, '${catEsc}', ${item.index})">&#8942;</span>
+        </div>
+      `;
+    });
+
+    htmlFav += "</div>";
+    colFav.innerHTML = htmlFav;
+    container.appendChild(colFav);
+  }
+
+  // categorias normais
+  categoriasBase.forEach(categoria => {
+    const col = document.createElement("div");
+    col.className = "category";
+
+    const collapsed = collapsedCategories.has(categoria);
+    const arrow = collapsed ? "▸" : "▾";
+
+    const contatosOrdenados = [...(dados[categoria] || [])].map((c,idx) => ({...c, _idx:idx}));
+    contatosOrdenados.sort((a,b) => {
+      if ((a.favorito===true) !== (b.favorito===true)) {
+        return a.favorito ? -1 : 1;
+      }
+      return a.nome.localeCompare(b.nome,"pt-BR");
+    });
+
+    let html = `
+      <div class="category-header">
+        <span class="category-title" onclick="toggleCategoria('${categoria.replace(/'/g,"\\'")}')">${categoria}</span>
+        <div class="category-right">
+          <span class="category-menu-btn" onclick="abrirMenuCategoria(event, '${categoria.replace(/'/g,"\\'")}')">&#8942;</span>
+          <span class="category-arrow" onclick="toggleCategoria('${categoria.replace(/'/g,"\\'")}')">${arrow}</span>
+        </div>
+      </div>
+      <div class="category-body" style="display:${collapsed ? "none" : "block"};">
+    `;
+
+    contatosOrdenados.forEach(contato => {
+      const indexOriginal = contato._idx;
+      const favClass = contato.favorito ? "favorite-btn favorito" : "favorite-btn";
+      const iniciais = iniciaisNome(contato.nome);
+      const linhaTelefone = contato.celular || contato.telefone || "";
+      const catEsc = categoria.replace(/'/g,"\\'");
+
+      html += `
+        <div class="link-card" onclick="abrirContato('${catEsc}', ${indexOriginal})">
+          <div class="avatar-circle">${iniciais}</div>
+          <div class="link-content">
+            <strong>${contato.nome}</strong>
+            <p class="phone-line">
+              <span>${linhaTelefone}</span>
+              <button class="whats-btn-card" title="WhatsApp" onclick="abrirWhatsAppCard(event, '${catEsc}', ${indexOriginal})">
+                <img class="whats-icon" src="${LOGO_WHATS}" alt="WhatsApp">
+              </button>
+            </p>
+          </div>
+          <span class="${favClass}" onclick="toggleFavorito(event, '${catEsc}', ${indexOriginal})">★</span>
+          <span class="link-menu-btn" onclick="abrirMenu(event, '${catEsc}', ${indexOriginal})">&#8942;</span>
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+    col.innerHTML = html;
+    container.appendChild(col);
+  });
+
+  if (document.getElementById("searchInput").value.trim() !== "") {
+    filtrar();
+  }
+}
+
+// datalist de categorias
+function atualizarListaCategorias(){
+  const datalist = document.getElementById("catList");
+  if (!datalist) return;
+
+  datalist.innerHTML = "";
+  const categorias = Object.keys(dados)
+    .filter(c => c !== JSON_VERSION_KEY)
+    .sort((a,b) => a.localeCompare(b, "pt-BR"));
+
+  categorias.forEach(cat => {
+    const opt = document.createElement("option");
+    opt.value = cat;
+    datalist.appendChild(opt);
+  });
+}
+
+// fechar menus e modais ao clicar fora
+document.addEventListener("click", function(e){
+  const contextMenu = document.getElementById("contextMenu");
+  const catMenu = document.getElementById("categoryMenu");
+
+  if (contextMenu.style.display === "block" && !e.target.closest("#contextMenu")) {
+    contextMenu.style.display = "none";
+  }
+  if (catMenu.style.display === "block" && !e.target.closest("#categoryMenu")) {
+    catMenu.style.display = "none";
+  }
+});
+
+document.getElementById("adminPanel").addEventListener("click", function(e){
+  if (e.target.id === "adminPanel") {
+    fecharAdmin();
+  }
+});
+
+document.getElementById("detalheContatoPanel").addEventListener("click", function(e){
+  if (e.target.id === "detalheContatoPanel") {
+    fecharDetalhe();
+  }
+});
+
+// =================== INICIALIZAÇÃO ===================
+async function initApp(){
+  aplicarModoAdmin();
+  atualizarInfoSincronizacao();
+
+  await inicializarFirebase();
+  await carregarDaNuvem();
+
+  renderizar();
+  atualizarListaCategorias();
+  atualizarInfoSincronizacao();
+}
+
+initApp();
+</script>
+</body>
+</html>

@@ -589,10 +589,6 @@ let contatoDetalhe = null;
 // último número usado para WhatsApp (detalhe)
 let ultimoCelularWhats = "";
 
-// IMPORTS DO FIREBASE (v9+ modular)
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
   // =================== FIREBASE / FIRESTORE ===================
   let db = null;
@@ -610,23 +606,24 @@ let ultimoCelularWhats = "";
   };
 
   async function inicializarFirebase() {
-    try {
-      const app = initializeApp(firebaseConfig);
-      const auth = getAuth(app);
-      db = getFirestore(app); // <<< agora usa a variável global
+  try {
+    // inicializa usando o SDK compat (global "firebase")
+    firebase.initializeApp(firebaseConfig);
 
-      // login anônimo (v9 modular)
-      await signInAnonymously(auth);
-      console.log("[DEBUG] Autenticado anonimamente no Firebase.");
+    // instancia do Firestore
+    db = firebase.firestore();
 
-      firebaseOk = true;
-      console.log("[DEBUG] Firebase inicializado.");
-    } catch (e) {
-      console.error("[DEBUG] Erro ao iniciar Firebase. Rodando só localStorage.", e);
-      firebaseOk = false;
-    }
+    // login anônimo
+    await firebase.auth().signInAnonymously();
+    console.log("[DEBUG] Autenticado anonimamente no Firebase.");
+
+    firebaseOk = true;
+    console.log("[DEBUG] Firebase inicializado.");
+  } catch (e) {
+    console.error("[DEBUG] Erro ao iniciar Firebase. Rodando só localStorage.", e);
+    firebaseOk = false;
   }
-
+}
 
 // Salva local
 function salvarLocal() {
@@ -1524,6 +1521,7 @@ initApp();
 </script>
 </body>
 </html>
+
 
 
 

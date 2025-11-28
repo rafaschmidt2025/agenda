@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Administração de excluídos - Agenda de Telefones</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: #0f172a;
+      color: #e5e7eb;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin: 0 0 4px 0;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 16px;
+    }
+
+    .panel {
+      background: #020617;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      border: 1px solid #1f2937;
+    }
+
+    .row-top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+      justify-content: space-between;
+    }
+
+    button {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: #f9fafb;
+    }
+
+    .btn-secondary {
+      background: #111827;
+      color: #e5e7eb;
+      border: 1px solid #374151;
+    }
+
+    .btn-danger {
+      background: #b91c1c;
+      color: #fee2e2;
+    }
+
+    .btn-small {
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    th, td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #1f2937;
+      vertical-align: middle;
+    }
+
+    th {
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #9ca3af;
+      background: #020617;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tr:nth-child(even) td {
+      background: #020617;
+    }
+
+    tr:nth-child(odd) td {
+      background: #020617ee;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: #111827;
+      color: #e5e7eb;
+      border: 1px solid #1f2937;
+    }
+
+    .layout-columns {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .layout-columns {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .muted {
+      color: #9ca3af;
+      font-size: 11px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: #111827;
+      border: 1px solid #374151;
+    }
+
+    #status {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-left: 8px;
+    }
+
+    .mono {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      border: 1px solid #374151;
+      color: #e5e7eb;
+    }
+
+    .tag-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+    }
+
+    .tag-dot-danger {
+      background: #ef4444;
+    }
+
+    .scroll-box {
+      max-height: 380px;
+      overflow-y: auto;
+      border-radius: 8px;
+      border: 1px solid #1f2937;
+      background: #020617;
+    }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>🧠 chatgpt.html — Administração de excluídos</h1>
+    <div class="subtitle">
+      Sala secreta para gerenciar <strong>contatos</strong> e <strong>categorias</strong> deletados da Agenda de Telefones.<br>
+      Aqui você pode <span class="pill">reviver</span> ou <span class="pill">apagar definitivamente</span>.
+    </div>
+
+    <div class="row-top">
+      <div>
+        <button class="btn-secondary" onclick="recarregar()">🔄 Recarregar da nuvem</button>
+        <span id="status"></span>
+      </div>
+      <div class="muted">
+        Documento Firestore: <span class="mono">config / agenda</span>
+      </div>
+    </div>
+
+    <div class="layout-columns">
+      <!-- Coluna de categorias -->
+      <div>
+        <h2>Categorias deletadas</h2>
+        <div class="muted">
+          ✨ Reviver categoria volta a torná-la visível na agenda.  
+          🧨 Apagar definitivamente remove a categoria do JSON.
+        </div>
+        <div class="scroll-box">
+          <table>
+            <thead>
+              <tr>
+                <th>Categoria</th>
+                <th>Atualizado em</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyCategoriasDeletadas">
+              <tr>
+                <td colspan="3" class="muted">Carregando...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Coluna de contatos -->
+      <div>
+        <h2>Contatos deletados</h2>
+        <div class="muted">
+          ✨ Reviver contato marca como ativo novamente.  
+          🧨 Apagar definitivamente remove o contato do JSON.
+        </div>
+        <div class="scroll-box">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Categoria</th>
+                <th>Telefone / Celular</th>
+                <th>E-mail</th>
+                <th>Atualizado em</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyContatosDeletados">
+              <tr>
+                <td colspan="6" class="muted">Carregando...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px; font-size: 11px; color: #6b7280;">
+      Dica: esta página não está linkada em lugar nenhum. Só acessa quem souber a URL completa.
+    </div>
+  </div>
+
+  <!-- Firebase compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+
+  <script>
+    // ==== CHAVES ESPECIAIS (mesmas da agenda) ====
+    const JSON_VERSION_KEY = "__versao";
+    const DELETED_CATEGORIES_KEY = "__deletedCategorias";
+
+    // ==== Firebase ====
+    let db = null;
+    let firebaseOk = false;
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDTYCyI-LAD-dn6dyAtnL79NwqFfK-myiw",
+      authDomain: "rafa-agenda.firebaseapp.com",
+      projectId: "rafa-agenda",
+      storageBucket: "rafa-agenda.appspot.com",
+      messagingSenderId: "117248247412",
+      appId: "1:117248247412:web:3871f4dd2960d5e05e7321",
+      measurementId: "G-40FPHD7J4S"
+    };
+
+    let dados = {};
+    let dadosVersao = 1;
+
+    function nowIso() {
+      return new Date().toISOString();
+    }
+
+    function formatarDataBR(iso){
+      if (!iso) return "—";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      const dia = String(d.getDate()).padStart(2,"0");
+      const mes = String(d.getMonth()+1).padStart(2,"0");
+      const ano = d.getFullYear();
+      const hora = String(d.getHours()).padStart(2,"0");
+      const min = String(d.getMinutes()).padStart(2,"0");
+      return `${dia}/${mes}/${ano} ${hora}:${min}`;
+    }
+
+    function setStatus(msg, tipo = "info") {
+      const el = document.getElementById("status");
+      if (!el) return;
+      el.textContent = msg;
+      if (tipo === "erro") {
+        el.style.color = "#f87171";
+      } else if (tipo === "ok") {
+        el.style.color = "#4ade80";
+      } else {
+        el.style.color = "#9ca3af";
+      }
+    }
+
+    async function inicializarFirebase(){
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.firestore();
+        await firebase.auth().signInAnonymously();
+        firebaseOk = true;
+        console.log("[chatgpt] Firebase ok, UID:", firebase.auth().currentUser?.uid);
+      } catch (e) {
+        console.error("[chatgpt] Erro Firebase:", e);
+        firebaseOk = false;
+        setStatus("Erro ao inicializar Firebase.", "erro");
+      }
+    }
+
+    async function carregarDaNuvemAdmin(){
+      if (!firebaseOk || !db) {
+        setStatus("Firebase não inicializado.", "erro");
+        return;
+      }
+      try {
+        setStatus("Carregando dados da nuvem...");
+        const snap = await db.collection("config").doc("agenda").get();
+        if (!snap.exists) {
+          setStatus("Documento config/agenda não encontrado.", "erro");
+          dados = {};
+          dadosVersao = 1;
+          renderAdmin();
+          return;
+        }
+        const data = snap.data() || {};
+        dados = data.dados || {};
+        dadosVersao = Number(data.versao || 1);
+        console.log("[chatgpt] Dados carregados. versao =", dadosVersao);
+        setStatus("Dados carregados da nuvem. Versão " + dadosVersao, "ok");
+        renderAdmin();
+      } catch (err) {
+        console.error("[chatgpt] Erro ao carregar:", err);
+        setStatus("Erro ao carregar dados da nuvem.", "erro");
+      }
+    }
+
+    async function salvarNaNuvemAdmin(mensagemPosSalvar){
+      if (!firebaseOk || !db) {
+        setStatus("Firebase não inicializado.", "erro");
+        return;
+      }
+      try {
+        dadosVersao = (dadosVersao || 1) + 1;
+        setStatus("Salvando na nuvem (versão " + dadosVersao + ")...");
+        await db.collection("config").doc("agenda").set({
+          dados,
+          versao: dadosVersao,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        setStatus(mensagemPosSalvar || "Alterações salvas na nuvem. Versão " + dadosVersao, "ok");
+        console.log("[chatgpt] Salvou versao =", dadosVersao);
+        renderAdmin();
+      } catch (err) {
+        console.error("[chatgpt] Erro ao salvar:", err);
+        setStatus("Erro ao salvar na nuvem.", "erro");
+      }
+    }
+
+    function isCategoriaDeletada(cat) {
+      const del = dados[DELETED_CATEGORIES_KEY];
+      return !!(del && del[cat] && del[cat].deleted);
+    }
+
+    // ==== RENDER ====
+    function renderAdmin(){
+      renderCategoriasDeletadas();
+      renderContatosDeletados();
+    }
+
+    function renderCategoriasDeletadas(){
+      const tbody = document.getElementById("tbodyCategoriasDeletadas");
+      if (!tbody) return;
+
+      tbody.innerHTML = "";
+
+      const mapa = dados[DELETED_CATEGORIES_KEY] || {};
+      const nomesCat = Object.keys(mapa);
+
+      if (nomesCat.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 3;
+        td.className = "muted";
+        td.textContent = "Nenhuma categoria marcada como deletada.";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      nomesCat.sort((a,b) => a.localeCompare(b, "pt-BR"));
+
+      nomesCat.forEach(cat => {
+        const info = mapa[cat] || {};
+        const tr = document.createElement("tr");
+
+        const tdNome = document.createElement("td");
+        tdNome.textContent = cat;
+        tr.appendChild(tdNome);
+
+        const tdData = document.createElement("td");
+        tdData.textContent = formatarDataBR(info.updatedAt || "");
+        tr.appendChild(tdData);
+
+        const tdAcoes = document.createElement("td");
+
+        const btnReviver = document.createElement("button");
+        btnReviver.className = "btn-small btn-primary";
+        btnReviver.textContent = "Reviver";
+        btnReviver.onclick = () => reviverCategoria(cat);
+
+        const btnKill = document.createElement("button");
+        btnKill.className = "btn-small btn-danger";
+        btnKill.style.marginLeft = "4px";
+        btnKill.textContent = "Excluir definitivamente";
+        btnKill.onclick = () => excluirCategoriaDefinitivo(cat);
+
+        tdAcoes.appendChild(btnReviver);
+        tdAcoes.appendChild(btnKill);
+        tr.appendChild(tdAcoes);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderContatosDeletados(){
+      const tbody = document.getElementById("tbodyContatosDeletados");
+      if (!tbody) return;
+
+      tbody.innerHTML = "";
+
+      const deletados = [];
+
+      for (const cat in dados) {
+        if (cat === JSON_VERSION_KEY || cat === DELETED_CATEGORIES_KEY) continue;
+        const arr = dados[cat];
+        if (!Array.isArray(arr)) continue;
+
+        arr.forEach((contato, idx) => {
+          if (contato && contato.deleted) {
+            deletados.push({
+              categoria: cat,
+              index: idx,
+              contato
+            });
+          }
+        });
+      }
+
+      if (deletados.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 6;
+        td.className = "muted";
+        td.textContent = "Nenhum contato marcado como deletado.";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      // opcional: ordenar por data decrescente
+      deletados.sort((a,b) => {
+        const ta = a.contato.updatedAt || "";
+        const tb = b.contato.updatedAt || "";
+        return (tb > ta) ? 1 : (tb < ta ? -1 : 0);
+      });
+
+      deletados.forEach(item => {
+        const tr = document.createElement("tr");
+
+        const tdNome = document.createElement("td");
+        tdNome.textContent = item.contato.nome || "(sem nome)";
+        tr.appendChild(tdNome);
+
+        const tdCat = document.createElement("td");
+        tdCat.textContent = item.categoria;
+        tr.appendChild(tdCat);
+
+        const tdTel = document.createElement("td");
+        const tel = item.contato.telefone || "";
+        const cel = item.contato.celular || "";
+        tdTel.textContent = [cel, tel].filter(Boolean).join(" / ") || "—";
+        tr.appendChild(tdTel);
+
+        const tdEmail = document.createElement("td");
+        tdEmail.textContent = item.contato.email || "—";
+        tr.appendChild(tdEmail);
+
+        const tdData = document.createElement("td");
+        tdData.textContent = formatarDataBR(item.contato.updatedAt || "");
+        tr.appendChild(tdData);
+
+        const tdAcoes = document.createElement("td");
+
+        const btnReviver = document.createElement("button");
+        btnReviver.className = "btn-small btn-primary";
+        btnReviver.textContent = "Reviver";
+        btnReviver.onclick = () => reviverContato(item.categoria, item.index);
+
+        const btnKill = document.createElement("button");
+        btnKill.className = "btn-small btn-danger";
+        btnKill.style.marginLeft = "4px";
+        btnKill.textContent = "Excluir definitivamente";
+        btnKill.onclick = () => excluirContatoDefinitivo(item.categoria, item.index);
+
+        tdAcoes.appendChild(btnReviver);
+        tdAcoes.appendChild(btnKill);
+        tr.appendChild(tdAcoes);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ==== AÇÕES ====
+    function recarregar(){
+      carregarDaNuvemAdmin();
+    }
+
+    function reviverCategoria(cat){
+      if (!dados[DELETED_CATEGORIES_KEY] || !dados[DELETED_CATEGORIES_KEY][cat]) {
+        alert("Categoria não está marcada como deletada.");
+        return;
+      }
+      if (!confirm(`Reviver a categoria "${cat}"? Ela voltará a aparecer na agenda.`)) {
+        return;
+      }
+
+      // remove tombstone
+      delete dados[DELETED_CATEGORIES_KEY][cat];
+      if (Object.keys(dados[DELETED_CATEGORIES_KEY]).length === 0) {
+        delete dados[DELETED_CATEGORIES_KEY];
+      }
+
+      // reviver contatos da categoria (se existirem)
+      const arr = dados[cat];
+      if (Array.isArray(arr)) {
+        arr.forEach(c => {
+          if (c.deleted) {
+            c.deleted = false;
+            c.updatedAt = nowIso();
+          }
+        });
+      }
+
+      salvarNaNuvemAdmin(`Categoria "${cat}" revivida e salva na nuvem.`);
+    }
+
+    function excluirCategoriaDefinitivo(cat){
+      if (!confirm(`Tem certeza que deseja excluir DEFINITIVAMENTE a categoria "${cat}" e todos os contatos dela? Esta ação não pode ser desfeita.`)) {
+        return;
+      }
+
+      // remove tombstone
+      if (dados[DELETED_CATEGORIES_KEY] && dados[DELETED_CATEGORIES_KEY][cat]) {
+        delete dados[DELETED_CATEGORIES_KEY][cat];
+        if (Object.keys(dados[DELETED_CATEGORIES_KEY]).length === 0) {
+          delete dados[DELETED_CATEGORIES_KEY];
+        }
+      }
+
+      // remove lista da categoria
+      if (dados[cat]) {
+        delete dados[cat];
+      }
+
+      salvarNaNuvemAdmin(`Categoria "${cat}" removida definitivamente da nuvem.`);
+    }
+
+    function reviverContato(categoria, index){
+      const arr = dados[categoria];
+      if (!Array.isArray(arr) || !arr[index]) {
+        alert("Contato não encontrado (categoria/índice inválido).");
+        return;
+      }
+      const c = arr[index];
+      if (!c.deleted) {
+        alert("Contato já não está marcado como deletado.");
+        return;
+      }
+
+      if (!confirm(`Reviver o contato "${c.nome || "(sem nome)"}" da categoria "${categoria}"?`)) {
+        return;
+      }
+
+      c.deleted = false;
+      c.updatedAt = nowIso();
+
+      salvarNaNuvemAdmin(`Contato "${c.nome || "(sem nome)"}" revivido e salvo na nuvem.`);
+    }
+
+    function excluirContatoDefinitivo(categoria, index){
+      const arr = dados[categoria];
+      if (!Array.isArray(arr) || !arr[index]) {
+        alert("Contato não encontrado (categoria/índice inválido).");
+        return;
+      }
+      const c = arr[index];
+
+      if (!confirm(`Excluir DEFINITIVAMENTE o contato "${c.nome || "(sem nome)"}" da categoria "${categoria}"?\nEsta ação não pode ser desfeita.`)) {
+        return;
+      }
+
+      arr.splice(index, 1);
+      if (arr.length === 0) {
+        // se a categoria está deletada, mantemos só o tombstone;
+        // se não está deletada, mantemos a categoria vazia mesmo.
+        dados[categoria] = [];
+      }
+
+      salvarNaNuvemAdmin(`Contato "${c.nome || "(sem nome)"}" removido definitivamente da nuvem.`);
+    }
+
+    // ==== INIT ====
+    (async function init(){
+      setStatus("Iniciando...");
+      await inicializarFirebase();
+      await carregarDaNuvemAdmin();
+    })();
+  </script>
+</body>
+</html>

@@ -607,8 +607,10 @@ const firebaseConfig = {
   measurementId: "G-40FPHD7J4S"
 };
 
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+// se estiver usando firestore sdk:
+    const db = getFirestore(app);
 
     // login anônimo para permitir write com regra "request.auth != null"
     await firebase.auth().signInAnonymously();
@@ -1518,4 +1520,5 @@ initApp();
 </script>
 </body>
 </html>
+
 

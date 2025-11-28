@@ -597,11 +597,15 @@ const LOGO_WHATS = "https://img.freepik.com/vetores-premium/icone-do-whatsapp-re
 async function inicializarFirebase() {
   try {
     // ⚠️ Preencha esse config com o snippet do Firebase Console
-    const firebaseConfig = {
-      apiKey: "SUA_API_KEY_AQUI",
-      authDomain: "rafa-agenda.firebaseapp.com",
-      projectId: "rafa-agenda"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyDTYCyI-LAD-dn6dyAtnL79NwqFfK-myiw",
+  authDomain: "rafa-agenda.firebaseapp.com",
+  projectId: "rafa-agenda",
+  storageBucket: "rafa-agenda.firebasestorage.app",
+  messagingSenderId: "117248247412",
+  appId: "1:117248247412:web:3871f4dd2960d5e05e7321",
+  measurementId: "G-40FPHD7J4S"
+};
 
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
@@ -1514,3 +1518,4 @@ initApp();
 </script>
 </body>
 </html>
+

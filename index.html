@@ -589,33 +589,31 @@ let contatoDetalhe = null;
 // último número usado para WhatsApp (detalhe)
 let ultimoCelularWhats = "";
 
+// =================== FIREBASE / FIRESTORE ===================
+let db = null;
+let firebaseOk = false;
+const LOGO_WHATS = "https://img.freepik.com/vetores-premium/icone-do-whatsapp-rede-social-para-mensagens-editorial-ilustracao-vetorial-vinnytsia-ucrania-9-de-junho-de-2022_350225-70.jpg?semt=ais_hybrid&w=740&q=80";
 
-  // =================== FIREBASE / FIRESTORE ===================
-  let db = null;
-  let firebaseOk = false;
-  const LOGO_WHATS = "https://img.freepik.com/vetores-premium/icone-do-whatsapp-rede-social-para-mensagens-editorial-ilustracao-vetorial-vinnytsia-ucrania-9-de-junho-de-2022_350225-70.jpg?semt=ais_hybrid&w=740&q=80";
+const firebaseConfig = {
+  apiKey: "AIzaSyDTYCyI-LAD-dn6dyAtnL79NwqFfK-myiw",
+  authDomain: "rafa-agenda.firebaseapp.com",
+  projectId: "rafa-agenda",
+  storageBucket: "rafa-agenda.appspot.com",
+  messagingSenderId: "117248247412",
+  appId: "1:117248247412:web:3871f4dd2960d5e05e7321",
+  measurementId: "G-40FPHD7J4S"
+};
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyDTYCyI-LAD-dn6dyAtnL79NwqFfK-myiw",
-    authDomain: "rafa-agenda.firebaseapp.com",
-    projectId: "rafa-agenda",
-    storageBucket: "rafa-agenda.appspot.com",        // confere isso no console!
-    messagingSenderId: "117248247412",
-    appId: "1:117248247412:web:3871f4dd2960d5e05e7321",
-    measurementId: "G-40FPHD7J4S"
-  };
-
-  async function inicializarFirebase() {
+async function inicializarFirebase() {
   try {
-    // inicializa usando o SDK compat (global "firebase")
-    firebase.initializeApp(firebaseConfig);
-
-    // instancia do Firestore
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+      console.log("[DEBUG] App Firebase inicializado:", firebase.app().name);
+    }
     db = firebase.firestore();
 
-    // login anônimo
     await firebase.auth().signInAnonymously();
-    console.log("[DEBUG] Autenticado anonimamente no Firebase.");
+    console.log("[DEBUG] Autenticado anonimamente no Firebase.", firebase.auth().currentUser?.uid);
 
     firebaseOk = true;
     console.log("[DEBUG] Firebase inicializado.");
@@ -624,6 +622,133 @@ let ultimoCelularWhats = "";
     firebaseOk = false;
   }
 }
+
+// =================== IDS ÚNICOS E MERGE LOCAL × NUVEM ===================
+function gerarIdContato() {
+  return "c_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function normalizarTelefoneNum(telefone) {
+  return (telefone || "").replace(/\D/g, "");
+}
+
+function chaveFallbackContato(contato) {
+  const nome = (contato.nome || "").trim().toLowerCase();
+  const telBase = normalizarTelefoneNum(contato.celular || contato.telefone || "");
+  const email = (contato.email || "").trim().toLowerCase();
+  return `${nome}|${telBase}|${email}`;
+}
+
+// normaliza local + remoto de uma vez, garantindo mesmo ID para mesma pessoa (por fallback)
+function normalizarLocalERemotoComIds(localDados, remotoDados) {
+  const keyToId = new Map();
+
+  function processar(orig) {
+    const resultado = {};
+    for (const cat in orig || {}) {
+      if (cat === JSON_VERSION_KEY) {
+        resultado[cat] = orig[cat];
+        continue;
+      }
+      const lista = orig[cat];
+      if (!Array.isArray(lista) || !lista.length) continue;
+
+      resultado[cat] = lista.map(contato => {
+        const c = { ...contato };
+        if (!c.id) {
+          const key = chaveFallbackContato(c);
+          if (key && keyToId.has(key)) {
+            c.id = keyToId.get(key);
+          } else {
+            c.id = gerarIdContato();
+            if (key) keyToId.set(key, c.id);
+          }
+        }
+        if (!c.updatedAt) {
+          c.updatedAt = nowIso();
+        }
+        return c;
+      });
+    }
+    return resultado;
+  }
+
+  const remotoNorm = processar(remotoDados || {});
+  const localNorm = processar(localDados || {});
+
+  return { localNorm, remotoNorm };
+}
+
+function mergeDadosPorId(localDados, remotoDados) {
+  const resultado = {};
+  const categorias = new Set([
+    ...Object.keys(localDados || {}),
+    ...Object.keys(remotoDados || {})
+  ]);
+
+  categorias.forEach(cat => {
+    if (cat === JSON_VERSION_KEY) {
+      // mantém a chave de versão, se existir
+      resultado[cat] = localDados[cat] || remotoDados[cat];
+      return;
+    }
+
+    const listaLocal = Array.isArray(localDados[cat]) ? localDados[cat] : [];
+    const listaRemota = Array.isArray(remotoDados[cat]) ? remotoDados[cat] : [];
+
+    const mapaRemoto = new Map();
+    const merged = [];
+
+    listaRemota.forEach(c => {
+      mapaRemoto.set(c.id, c);
+      merged.push(c);
+    });
+
+    listaLocal.forEach(cLocal => {
+      const cRem = mapaRemoto.get(cLocal.id);
+      if (!cRem) {
+        merged.push(cLocal);
+      } else {
+        // escolhe o mais recente por updatedAt, se existir; senão, prioriza local
+        const tLocal = cLocal.updatedAt || "";
+        const tRem = cRem.updatedAt || "";
+        let usarLocal = false;
+
+        if (tLocal && tRem) {
+          usarLocal = tLocal > tRem;
+        } else if (tLocal && !tRem) {
+          usarLocal = true;
+        } else if (!tLocal && !tRem) {
+          usarLocal = true;
+        }
+
+        if (usarLocal) {
+          const idx = merged.findIndex(c => c.id === cLocal.id);
+          if (idx >= 0) merged[idx] = cLocal;
+        }
+      }
+    });
+
+    if (merged.length > 0) {
+      resultado[cat] = merged;
+    }
+  });
+
+  return resultado;
+}
+
+// garante que o que já está no localStorage tenha IDs (para uso mesmo sem nuvem)
+function normalizarSomenteLocal(dadosOrig) {
+  const { localNorm } = normalizarLocalERemotoComIds(dadosOrig || {}, {});
+  return localNorm;
+}
+
+// aplica migração de IDs nos dados carregados do localStorage
+dados = normalizarSomenteLocal(dados);
 
 // Salva local
 function salvarLocal() {
@@ -688,7 +813,7 @@ function salvarLocalENuvem() {
   salvarNaNuvem();
 }
 
-// Carrega da nuvem se tiver algo
+// Carrega da nuvem com merge por ID
 async function carregarDaNuvem() {
   if (!firebaseOk || !db) return;
   try {
@@ -698,24 +823,65 @@ async function carregarDaNuvem() {
       return;
     }
     const data = snap.data() || {};
-    const remoto = data.dados || {};
+    let remotoDados = data.dados || {};
     const versaoRemota = Number(data.versao || 1);
 
     console.log("[DEBUG] Dados Firestore carregados. versaoRemota =", versaoRemota);
 
     const localVazio = !dados || Object.keys(dados).length === 0;
-    if (localVazio || versaoRemota > dadosVersao) {
-      dados = remoto;
+    const remotoVazio = !remotoDados || Object.keys(remotoDados).length === 0;
+
+    // caso 1: local vazio, nuvem cheia → traz da nuvem
+    if (localVazio && !remotoVazio) {
+      const { remotoNorm } = normalizarLocalERemotoComIds({}, remotoDados);
+      dados = remotoNorm;
       dadosVersao = versaoRemota;
       salvarLocal();
       localStorage.setItem("agendaTelefonesVersao", String(dadosVersao));
-      console.log("[DEBUG] Dados locais atualizados a partir da nuvem.");
+      console.log("[DEBUG] Dados locais substituídos pelos da nuvem (local vazio).");
       showToast("Agenda carregada da nuvem.");
-    } else {
-      console.log("[DEBUG] Dados locais já mais novos ou iguais. Mantendo local.");
+      return;
     }
+
+    // caso 2: local cheio, nuvem vazia → manda local pra nuvem
+    if (!localVazio && remotoVazio) {
+      console.log("[DEBUG] Nuvem vazia, enviando dados locais.");
+      dados = normalizarSomenteLocal(dados);
+      salvarLocal();
+      await salvarNaNuvem();
+      return;
+    }
+
+    // caso 3: os dois têm dados → fazer merge por ID
+    const { localNorm, remotoNorm } = normalizarLocalERemotoComIds(dados, remotoDados);
+    const dadosMesclados = mergeDadosPorId(localNorm, remotoNorm);
+
+    // se ficar idêntico, evita gravar à toa
+    if (JSON.stringify(dadosMesclados) === JSON.stringify(remotoNorm)) {
+      dados = remotoNorm;
+      dadosVersao = versaoRemota;
+      salvarLocal();
+      localStorage.setItem("agendaTelefonesVersao", String(dadosVersao));
+      console.log("[DEBUG] Dados já sincronizados. Nenhum merge extra necessário.");
+      return;
+    }
+
+    dados = dadosMesclados;
+    dadosVersao = Math.max(dadosVersao || 1, versaoRemota || 1) + 1;
+
+    salvarLocal();
+    localStorage.setItem("agendaTelefonesVersao", String(dadosVersao));
+
+    await db.collection("config").doc("agenda").set({
+      dados,
+      versao: dadosVersao,
+      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    console.log("[DEBUG] Conflito local×nuvem resolvido por merge com ID. versao =", dadosVersao);
+    showToast("Agenda sincronizada (merge local + nuvem).");
   } catch (err) {
-    console.error("[DEBUG] Erro ao carregar da nuvem:", err);
+    console.error("[DEBUG] Erro ao carregar/mesclar dados da nuvem:", err);
   }
 }
 
@@ -948,8 +1114,11 @@ function salvar() {
     const oldIndex = editInfo.index;
     const oldContato = dados[oldCat][oldIndex];
     const favorito = oldContato.favorito === true;
+    const id = oldContato.id || gerarIdContato();
+    const criadoEm = oldContato.criadoEm || nowIso();
 
     const novoContato = {
+      id,
       nome,
       telefone,
       celular,
@@ -958,7 +1127,9 @@ function salvar() {
       funcao,
       nascimento,
       obs,
-      favorito
+      favorito,
+      criadoEm,
+      updatedAt: nowIso()
     };
 
     if (oldCat.toLowerCase() === categoriaChave.toLowerCase()) {
@@ -972,8 +1143,8 @@ function salvar() {
     }
     msgToast = "Contato atualizado com sucesso.";
   } else {
-    if (!dados[categoriaChave]) dados[categoriaChave] = [];
-    dados[categoriaChave].push({
+    const novoContato = {
+      id: gerarIdContato(),
       nome,
       telefone,
       celular,
@@ -982,8 +1153,13 @@ function salvar() {
       funcao,
       nascimento,
       obs,
-      favorito:false
-    });
+      favorito:false,
+      criadoEm: nowIso(),
+      updatedAt: nowIso()
+    };
+
+    if (!dados[categoriaChave]) dados[categoriaChave] = [];
+    dados[categoriaChave].push(novoContato);
   }
 
   salvarLocalENuvem();
@@ -1097,6 +1273,7 @@ function toggleFavorito(event, categoria, index){
   event.stopPropagation();
   const contato = dados[categoria][index];
   contato.favorito = !contato.favorito;
+  contato.updatedAt = nowIso();
   salvarLocalENuvem();
   renderizar();
 }
@@ -1519,8 +1696,10 @@ async function initApp(){
 
 initApp();
 </script>
+
 </body>
 </html>
+
 
 
 

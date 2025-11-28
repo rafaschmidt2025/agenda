@@ -1027,10 +1027,13 @@ function contarContatos(){
   for (const cat in dados) {
     if (cat === JSON_VERSION_KEY) continue;
     const arr = dados[cat];
-    if (Array.isArray(arr)) total += arr.length;
+    if (Array.isArray(arr)) {
+      total += arr.filter(c => !c.deleted).length;
+    }
   }
   return total;
 }
+
 
 function atualizarInfoSincronizacao(){
   const el = document.getElementById("syncInfo");
@@ -1083,6 +1086,8 @@ function salvar() {
     if (!Array.isArray(contatosCat)) continue;
 
     contatosCat.forEach((c, idx) => {
+      if (c.deleted) return; // ignora contatos apagados
+
       if (editInfo &&
           editInfo.categoria === cat &&
           editInfo.index === idx) {
@@ -1090,6 +1095,7 @@ function salvar() {
       }
       const celExistente = (c.celular || "").replace(/\D/g, "");
       const emailExistente = (c.email || "").trim().toLowerCase();
+
 
       const mesmoCel = celularChave && celExistente && celularChave === celExistente;
       const mesmoEmail = emailLower && emailExistente && emailLower === emailExistente;
@@ -1334,11 +1340,14 @@ function apagarContato(){
   const cat = menu.dataset.categoria;
   const idx = parseInt(menu.dataset.index,10);
 
-  if(confirm("Deseja realmente apagar este contato?")){
-    dados[cat].splice(idx,1);
-    if (dados[cat].length === 0) {
-      delete dados[cat];
+  if (confirm("Deseja realmente apagar este contato?")) {
+    const contato = dados[cat][idx];
+    if (contato) {
+      // remoção lógica: marca como deletado e atualiza timestamp
+      contato.deleted = true;
+      contato.updatedAt = nowIso();
     }
+
     salvarLocalENuvem();
     renderizar();
     atualizarListaCategorias();
@@ -1347,6 +1356,7 @@ function apagarContato(){
   }
   fecharMenus();
 }
+
 
 // ações de categoria
 function adicionarContatoCategoria(){
@@ -1515,16 +1525,17 @@ function renderizar(){
     .filter(c => c !== JSON_VERSION_KEY)
     .sort((a,b) => a.localeCompare(b, "pt-BR"));
 
-  // favoritos globais
+    // favoritos globais (ignora deletados)
   const favoritosGlobais = [];
   categoriasBase.forEach(categoria => {
     const arr = dados[categoria] || [];
     arr.forEach((contato, idx) => {
-      if (contato.favorito) {
+      if (contato.favorito && !contato.deleted) {
         favoritosGlobais.push({ categoria, index: idx, contato });
       }
     });
   });
+
 
   if (favoritosGlobais.length > 0) {
     const colFav = document.createElement("div");
@@ -1585,7 +1596,7 @@ function renderizar(){
     const collapsed = collapsedCategories.has(categoria);
     const arrow = collapsed ? "▸" : "▾";
 
-    const contatosOrdenados = [...(dados[categoria] || [])].map((c,idx) => ({...c, _idx:idx}));
+        const contatosOrdenados = [...(dados[categoria] || [])].map((c,idx) => ({...c, _idx:idx})).filter(c => !c.deleted);
     contatosOrdenados.sort((a,b) => {
       if ((a.favorito===true) !== (b.favorito===true)) {
         return a.favorito ? -1 : 1;
@@ -1699,6 +1710,7 @@ initApp();
 
 </body>
 </html>
+
 
 
 

@@ -427,6 +427,28 @@ button {
   justify-content:center;
 }
 
+/* Botão de Teams (detalhe) */
+.teams-btn {
+  margin-left: 8px;
+  padding: 4px 8px;
+  font-size: 14px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: #3b82f6;   /* azul */
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* (opcional) caso use ícone em imagem */
+.teams-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+  
 /* Mobile: mostrar sempre o menu ⋮ dos contatos */
 @media (max-width: 600px) {
   .link-menu-btn {
@@ -525,10 +547,14 @@ button {
         <img class="whats-icon" src="https://img.freepik.com/vetores-premium/icone-do-whatsapp-rede-social-para-mensagens-editorial-ilustracao-vetorial-vinnytsia-ucrania-9-de-junho-de-2022_350225-70.jpg?semt=ais_hybrid&w=740&q=80" alt="WhatsApp">
       </button>
     </div>
-    <div class="detalhe-linha">
-      <span class="label">E-mail: </span>
-      <span id="detalheEmail"></span>
-    </div>
+  <div class="detalhe-linha">
+    <span class="label">E-mail: </span>
+    <span id="detalheEmail"></span>
+    <button class="teams-btn" id="detalheTeamsBtn" title="Abrir chat no Teams" onclick="abrirTeams()">
+       <img class="whats-icon" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQychPQjxHP_T53JXZDtA3L5BHAu_REHa92NQ&s" alt="Teams">
+  </button>
+</div>
+
     <div class="detalhe-linha">
       <span class="label">Data de nascimento: </span>
       <span id="detalheNascimento"></span>
@@ -595,6 +621,8 @@ let isAdmin = JSON.parse(localStorage.getItem("agendaTelefonesIsAdmin") || "fals
 let contatoDetalhe = null;
 // último número usado para WhatsApp (detalhe)
 let ultimoCelularWhats = "";
+// último e-mail usado para Teams (detalhe)
+let ultimoEmailTeams = "";
 
 // =================== FIREBASE / FIRESTORE ===================
 let db = null;
@@ -1251,12 +1279,13 @@ function abrirContato(categoria, index) {
   const catEl = document.getElementById("detalheCategoria");
   const telEl = document.getElementById("detalheTelefone");
   const celEl = document.getElementById("detalheCelular");
-  const emailEl = document.getElementById("detalheEmail");
+   const emailEl = document.getElementById("detalheEmail");
   const obsEl = document.getElementById("detalheObs");
   const empEl = document.getElementById("detalheEmpresa");
   const funcEl = document.getElementById("detalheFuncao");
   const nascEl = document.getElementById("detalheNascimento");
   const whatsBtn = document.getElementById("detalheWhatsBtn");
+  const teamsBtn = document.getElementById("detalheTeamsBtn");
 
   avatar.textContent = iniciaisNome(contato.nome);
   nomeEl.textContent = contato.nome || "";
@@ -1280,7 +1309,20 @@ function abrirContato(categoria, index) {
     whatsBtn.disabled = true;
   }
 
+  // --- Teams: habilita só para e-mail @serpro.gov.br ---
+  const emailVal = (contato.email || "").trim().toLowerCase();
+  ultimoEmailTeams = emailVal;
+
+  if (emailVal.endsWith("@serpro.gov.br")) {
+    teamsBtn.style.display = "inline-flex";
+    teamsBtn.disabled = false;
+  } else {
+    teamsBtn.style.display = "none";
+    teamsBtn.disabled = true;
+  }
+
   document.getElementById("detalheContatoPanel").style.display = "flex";
+
 }
 
 function fecharDetalhe() {
@@ -1300,6 +1342,16 @@ function abrirWhatsApp(){
     numero = "55" + numero;
   }
   const url = "https://wa.me/" + numero;
+  window.open(url, "_blank");
+}
+  
+function abrirTeams(){
+  if (!ultimoEmailTeams || !ultimoEmailTeams.endsWith("@serpro.gov.br")) {
+    showToast("E-mail inválido para abrir no Teams.");
+    return;
+  }
+
+  const url = "https://teams.microsoft.com/l/chat/0/0?users=" + encodeURIComponent(ultimoEmailTeams);
   window.open(url, "_blank");
 }
 
@@ -1779,6 +1831,7 @@ initApp();
 
 </body>
 </html>
+
 
 
 

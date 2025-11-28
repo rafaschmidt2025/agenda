@@ -568,6 +568,13 @@ button {
 <script>
 // =================== CONFIG / ESTADO LOCAL ===================
 const JSON_VERSION_KEY = "__versao";
+const DELETED_CATEGORIES_KEY = "__deletedCategorias";
+
+function isCategoriaDeletada(cat) {
+  const del = dados[DELETED_CATEGORIES_KEY];
+  return !!(del && del[cat] && del[cat].deleted);
+}
+
 
 // 🔗 URL do webhook do Power Automate (cole aqui a URL depois de criar o fluxo)
 const WEBHOOK_URL = ""; // exemplo: "https://prod-XX.../invoke?api-version=2016-10-01"
@@ -650,7 +657,7 @@ function normalizarLocalERemotoComIds(localDados, remotoDados) {
   function processar(orig) {
     const resultado = {};
     for (const cat in orig || {}) {
-      if (cat === JSON_VERSION_KEY) {
+      if (cat === JSON_VERSION_KEY || cat === DELETED_CATEGORIES_KEY) {
         resultado[cat] = orig[cat];
         continue;
       }
@@ -689,11 +696,48 @@ function mergeDadosPorId(localDados, remotoDados) {
     ...Object.keys(localDados || {}),
     ...Object.keys(remotoDados || {})
   ]);
+  // merge das categorias deletadas (tombstones)
+  const localDel = localDados[DELETED_CATEGORIES_KEY] || {};
+  const remotoDel = remotoDados[DELETED_CATEGORIES_KEY] || {};
+  const mergedDel = {};
+
+  const nomesCatsDel = new Set([
+    ...Object.keys(localDel),
+    ...Object.keys(remotoDel)
+  ]);
+
+  nomesCatsDel.forEach(cat => {
+    const l = localDel[cat];
+    const r = remotoDel[cat];
+
+    if (l && !r) {
+      mergedDel[cat] = l;
+    } else if (!l && r) {
+      mergedDel[cat] = r;
+    } else if (l && r) {
+      const tL = l.updatedAt || "";
+      const tR = r.updatedAt || "";
+      // escolhe o mais novo
+      if (tL && tR) {
+        mergedDel[cat] = tL >= tR ? l : r;
+      } else if (tL && !tR) {
+        mergedDel[cat] = l;
+      } else {
+        mergedDel[cat] = r;
+      }
+    }
+  });
+
+  if (Object.keys(mergedDel).length > 0) {
+    resultado[DELETED_CATEGORIES_KEY] = mergedDel;
+  }
 
   categorias.forEach(cat => {
-    if (cat === JSON_VERSION_KEY) {
-      // mantém a chave de versão, se existir
-      resultado[cat] = localDados[cat] || remotoDados[cat];
+    if (cat === JSON_VERSION_KEY || cat === DELETED_CATEGORIES_KEY) {
+      // já tratado acima ou meta
+      if (cat === JSON_VERSION_KEY) {
+        resultado[cat] = localDados[cat] || remotoDados[cat];
+      }
       return;
     }
 
@@ -1025,7 +1069,9 @@ function iniciaisNome(nome){
 function contarContatos(){
   let total = 0;
   for (const cat in dados) {
-    if (cat === JSON_VERSION_KEY) continue;
+    if (cat === JSON_VERSION_KEY || cat === DELETED_CATEGORIES_KEY) continue;
+    if (isCategoriaDeletada(cat)) continue;
+
     const arr = dados[cat];
     if (Array.isArray(arr)) {
       total += arr.filter(c => !c.deleted).length;
@@ -1033,6 +1079,7 @@ function contarContatos(){
   }
   return total;
 }
+
 
 
 function atualizarInfoSincronizacao(){
@@ -1455,9 +1502,26 @@ function excluirCategoria(){
     return;
   }
 
-  delete dados[categoria];
-  salvarLocalENuvem();
+  // marca categoria como deletada (tombstone)
+  if (!dados[DELETED_CATEGORIES_KEY]) {
+    dados[DELETED_CATEGORIES_KEY] = {};
+  }
+  dados[DELETED_CATEGORIES_KEY][categoria] = {
+    deleted: true,
+    updatedAt: nowIso()
+  };
 
+  // opcional: marcar contatos dessa categoria também como deletados
+  const arr = dados[categoria];
+  if (Array.isArray(arr)) {
+    arr.forEach(c => {
+      c.deleted = true;
+      c.updatedAt = nowIso();
+    });
+  }
+
+  // não precisa dar delete em dados[categoria] aqui.
+  // a UI e a contagem já ignoram categorias deletadas.
   if (lastCategory === categoria) {
     lastCategory = "";
     localStorage.removeItem("agendaTelefonesUltimaCategoria");
@@ -1470,6 +1534,8 @@ function excluirCategoria(){
       JSON.stringify(Array.from(collapsedCategories))
     );
   }
+
+  salvarLocalENuvem();
 
   fecharMenus();
   renderizar();
@@ -1522,7 +1588,8 @@ function renderizar(){
   container.innerHTML = "";
 
   const categoriasBase = Object.keys(dados)
-    .filter(c => c !== JSON_VERSION_KEY)
+    .filter(c => c !== JSON_VERSION_KEY && c !== DELETED_CATEGORIES_KEY)
+    .filter(c => !isCategoriaDeletada(c))
     .sort((a,b) => a.localeCompare(b, "pt-BR"));
 
     // favoritos globais (ignora deletados)
@@ -1657,8 +1724,10 @@ function atualizarListaCategorias(){
 
   datalist.innerHTML = "";
   const categorias = Object.keys(dados)
-    .filter(c => c !== JSON_VERSION_KEY)
+    .filter(c => c !== JSON_VERSION_KEY && c !== DELETED_CATEGORIES_KEY)
+    .filter(c => !isCategoriaDeletada(c))
     .sort((a,b) => a.localeCompare(b, "pt-BR"));
+
 
   categorias.forEach(cat => {
     const opt = document.createElement("option");
@@ -1710,6 +1779,7 @@ initApp();
 
 </body>
 </html>
+
 
 
 

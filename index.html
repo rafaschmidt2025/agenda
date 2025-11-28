@@ -688,71 +688,36 @@ function salvarLocalENuvem() {
   salvarNaNuvem();
 }
 
-// Carrega da nuvem se tiver algo (com merge local x nuvem)
+// Carrega da nuvem se tiver algo
 async function carregarDaNuvem() {
   if (!firebaseOk || !db) return;
-
   try {
     const snap = await db.collection("config").doc("agenda").get();
     if (!snap.exists) {
       console.log("[DEBUG] Nenhum doc 'config/agenda' na nuvem ainda. Mantendo dados locais.");
       return;
     }
-
     const data = snap.data() || {};
-    const remotoDados = data.dados || {};
+    const remoto = data.dados || {};
     const versaoRemota = Number(data.versao || 1);
 
     console.log("[DEBUG] Dados Firestore carregados. versaoRemota =", versaoRemota);
 
     const localVazio = !dados || Object.keys(dados).length === 0;
-    const remotoVazio = !remotoDados || Object.keys(remotoDados).length === 0;
-
-    // caso 1: local vazio, nuvem cheia → copia nuvem pro local
-    if (localVazio && !remotoVazio) {
-      dados = remotoDados;
+    if (localVazio || versaoRemota > dadosVersao) {
+      dados = remoto;
       dadosVersao = versaoRemota;
       salvarLocal();
       localStorage.setItem("agendaTelefonesVersao", String(dadosVersao));
-      console.log("[DEBUG] Dados locais substituídos pelos da nuvem (local vazio).");
+      console.log("[DEBUG] Dados locais atualizados a partir da nuvem.");
       showToast("Agenda carregada da nuvem.");
-      return;
+    } else {
+      console.log("[DEBUG] Dados locais já mais novos ou iguais. Mantendo local.");
     }
-
-    // caso 2: local cheio, nuvem vazia → envia local pra nuvem
-    if (!localVazio && remotoVazio) {
-      console.log("[DEBUG] Nuvem vazia, enviando dados locais.");
-      await salvarNaNuvem();
-      return;
-    }
-
-    // caso 3: os dois existem e são idênticos → nada a fazer
-    if (JSON.stringify(dados) === JSON.stringify(remotoDados)) {
-      console.log("[DEBUG] Dados locais e remotos idênticos. Nada a mesclar.");
-      return;
-    }
-
-    // caso 4: conflito → merge local + nuvem
-    const dadosMesclados = mergeDados(dados, remotoDados);
-    dados = dadosMesclados;
-    dadosVersao = Math.max(dadosVersao || 1, versaoRemota || 1) + 1;
-
-    salvarLocal();
-    localStorage.setItem("agendaTelefonesVersao", String(dadosVersao));
-
-    await db.collection("config").doc("agenda").set({
-      dados,
-      versao: dadosVersao,
-      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    console.log("[DEBUG] Conflito local×nuvem resolvido por merge. versao =", dadosVersao);
-    showToast("Agenda sincronizada (merge local + nuvem).");
   } catch (err) {
-    console.error("[DEBUG] Erro ao carregar/mesclar dados da nuvem:", err);
+    console.error("[DEBUG] Erro ao carregar da nuvem:", err);
   }
 }
-
 
 // =================== UTILITÁRIOS / UI ===================
 function showToast(msg){
@@ -915,72 +880,6 @@ function formatarDataBR(iso){
   const mes = String(d.getMonth()+1).padStart(2,"0");
   const ano = d.getFullYear();
   return `${dia}/${mes}/${ano}`;
-}
-
-  
-// =================== MERGE LOCAL x NUVEM ===================
-function normalizarTelefoneNum(telefone) {
-  return (telefone || "").replace(/\D/g, "");
-}
-
-function gerarChaveContato(contato) {
-  const nome = (contato.nome || "").trim().toLowerCase();
-  const telBase = normalizarTelefoneNum(contato.celular || contato.telefone || "");
-  const email = (contato.email || "").trim().toLowerCase();
-  return `${nome}|${telBase}|${email}`;
-}
-
-function mergeListasContatos(listaLocal, listaRemota) {
-  const resultado = [];
-  const mapaRemoto = new Map();
-
-  (listaRemota || []).forEach(c => {
-    const chave = gerarChaveContato(c);
-    mapaRemoto.set(chave, c);
-    resultado.push(c); // começa com o que já está na nuvem
-  });
-
-  (listaLocal || []).forEach(cLocal => {
-    const chave = gerarChaveContato(cLocal);
-    if (!mapaRemoto.has(chave)) {
-      // contato só local → adiciona
-      resultado.push(cLocal);
-    } else {
-      // contato existe nos dois → se forem diferentes, prioriza LOCAL
-      const remoto = mapaRemoto.get(chave);
-      const iguais = JSON.stringify(remoto) === JSON.stringify(cLocal);
-      if (!iguais) {
-        const idx = resultado.findIndex(c => gerarChaveContato(c) === chave);
-        if (idx >= 0) {
-          resultado[idx] = cLocal;
-        }
-      }
-    }
-  });
-
-  return resultado;
-}
-
-function mergeDados(localDados, remotoDados) {
-  const resultado = {};
-  const categorias = new Set([
-    ...Object.keys(localDados || {}),
-    ...Object.keys(remotoDados || {})
-  ]);
-
-  categorias.forEach(cat => {
-    if (cat === JSON_VERSION_KEY) return;
-
-    const listaLocal = (localDados && Array.isArray(localDados[cat])) ? localDados[cat] : [];
-    const listaRemota = (remotoDados && Array.isArray(remotoDados[cat])) ? remotoDados[cat] : [];
-
-    const merged = mergeListasContatos(listaLocal, listaRemota);
-    if (merged.length > 0) {
-      resultado[cat] = merged;
-    }
-  });
-
-  return resultado;
 }
 
 // salvar contato
@@ -1622,8 +1521,6 @@ initApp();
 </script>
 </body>
 </html>
-
-
 
 
 

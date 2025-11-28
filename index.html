@@ -1115,6 +1115,37 @@ function atualizarInfoSincronizacao(){
   if (!el) return;
   el.textContent = "Contatos atuais: " + contarContatos();
 }
+  
+function isTeamsEmail(email){
+  if (!email) return false;
+
+  const e = email.trim().toLowerCase();
+  const partes = e.split("@");
+  if (partes.length !== 2) return false;
+
+  const dominio = partes[1];
+
+  // domínios típicos de e-mail pessoal (não vamos mostrar Teams)
+  const freeDomains = [
+    "gmail.com", "gmail.com.br",
+    "hotmail.com", "hotmail.com.br",
+    "outlook.com", "live.com",
+    "yahoo.com", "yahoo.com.br",
+    "icloud.com",
+    "bol.com.br", "uol.com.br", "terra.com.br"
+  ];
+
+  if (freeDomains.includes(dominio)) return false;
+
+  // alguns domínios governamentais / corporativos bem prováveis de usar M365
+  if (dominio === "serpro.gov.br") return true;
+  if (dominio.endsWith(".gov.br")) return true;
+  if (dominio.endsWith(".jus.br")) return true;
+  if (dominio.endsWith(".mp.br")) return true;
+
+  // fallback: qualquer outro domínio corporativo (empresa, órgão, etc.)
+  return true;
+}
 
 function formatarDataBR(iso){
   if (!iso) return "—";
@@ -1677,11 +1708,20 @@ function renderizar(){
       a.contato.nome.localeCompare(b.contato.nome, "pt-BR")
     );
 
-    favoritosGlobais.forEach(item => {
+        favoritosGlobais.forEach(item => {
       const favClass = item.contato.favorito ? "favorite-btn favorito" : "favorite-btn";
       const iniciais = iniciaisNome(item.contato.nome);
       const linhaTelefone = item.contato.celular || item.contato.telefone || "";
       const catEsc = item.categoria.replace(/'/g,"\\'");
+      const emailVal = (item.contato.email || "").trim().toLowerCase();
+      const hasTeams = isTeamsEmail(emailVal);
+      const teamsBtnHtml = hasTeams
+        ? `
+          <button class="teams-btn-card" title="Teams" onclick="abrirTeamsCard(event, '${catEsc}', ${item.index})">
+            <img class="teams-icon" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQychPQjxHP_T53JXZDtA3L5BHAu_REHa92NQ&s" alt="Teams">
+          </button>
+        `
+        : "";
 
       htmlFav += `
         <div class="link-card" onclick="abrirContato('${catEsc}', ${item.index})">
@@ -1693,6 +1733,7 @@ function renderizar(){
               <button class="whats-btn-card" title="WhatsApp" onclick="abrirWhatsAppCard(event, '${catEsc}', ${item.index})">
                 <img class="whats-icon" src="${LOGO_WHATS}" alt="WhatsApp">
               </button>
+              ${teamsBtnHtml}
             </p>
             <p style="margin-top:2px; font-size:11px; color:#9ca3af;">Categoria: ${item.categoria}</p>
           </div>
@@ -1734,12 +1775,21 @@ function renderizar(){
       <div class="category-body" style="display:${collapsed ? "none" : "block"};">
     `;
 
-    contatosOrdenados.forEach(contato => {
+        contatosOrdenados.forEach(contato => {
       const indexOriginal = contato._idx;
       const favClass = contato.favorito ? "favorite-btn favorito" : "favorite-btn";
       const iniciais = iniciaisNome(contato.nome);
       const linhaTelefone = contato.celular || contato.telefone || "";
       const catEsc = categoria.replace(/'/g,"\\'");
+      const emailVal = (contato.email || "").trim().toLowerCase();
+      const hasTeams = isTeamsEmail(emailVal);
+      const teamsBtnHtml = hasTeams
+        ? `
+          <button class="teams-btn-card" title="Teams" onclick="abrirTeamsCard(event, '${catEsc}', ${indexOriginal})">
+            <img class="teams-icon" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQychPQjxHP_T53JXZDtA3L5BHAu_REHa92NQ&s" alt="Teams">
+          </button>
+        `
+        : "";
 
       html += `
         <div class="link-card" onclick="abrirContato('${catEsc}', ${indexOriginal})">
@@ -1751,6 +1801,7 @@ function renderizar(){
               <button class="whats-btn-card" title="WhatsApp" onclick="abrirWhatsAppCard(event, '${catEsc}', ${indexOriginal})">
                 <img class="whats-icon" src="${LOGO_WHATS}" alt="WhatsApp">
               </button>
+              ${teamsBtnHtml}
             </p>
           </div>
           <span class="${favClass}" onclick="toggleFavorito(event, '${catEsc}', ${indexOriginal})">★</span>
@@ -1831,6 +1882,7 @@ initApp();
 
 </body>
 </html>
+
 
 
 
